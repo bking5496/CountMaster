@@ -26,27 +26,73 @@
 <body class="bg-slate-50 text-slate-900 min-h-screen font-sans antialiased selection:bg-indigo-100 selection:text-indigo-700">
     <div id="app" class="max-w-md mx-auto min-h-screen bg-white shadow-2xl shadow-slate-200 overflow-hidden relative"></div>
 
-    <script type="module">
-        // Import Neon serverless driver
-        import { neon } from 'https://esm.sh/@neondatabase/serverless@0.9.0';
-        
-        // DATABASE CONFIGURATION
+    <script>
+        // DATABASE CONFIGURATION - Direct Neon HTTP API
         // =====================
+        const NEON_PROJECT_ID = 'ep-restless-river-aey5vyvy';
+        const NEON_HOST = 'ep-restless-river-aey5vyvy-pooler.c-2.us-east-2.aws.neon.tech';
         const DATABASE_URL = 'postgresql://neondb_owner:npg_ZgY7c2jDrizh@ep-restless-river-aey5vyvy-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require';
-        
-        // Create the SQL query function with fullResults option for proper result handling
-        const sql = neon(DATABASE_URL, { fullResults: true });
 
-        // Database helper functions using Neon Serverless Driver
+        // Database helper functions using direct fetch to Neon SQL API
         const db = {
             connected: false,
             
             async query(queryText, params = []) {
                 try {
-                    // Use sql.query() for parameterized queries
-                    const result = await sql.query(queryText, params);
-                    console.log('DB Query result:', result);
-                    return { rows: result.rows || [] };
+                    // Replace $1, $2, etc. with actual values for the HTTP API
+                    let processedQuery = queryText;
+                    params.forEach((param, index) => {
+                        const placeholder = `$${index + 1}`;
+                        let value;
+                        if (param === null || param === undefined) {
+                            value = 'NULL';
+                        } else if (typeof param === 'string') {
+                            value = `'${param.replace(/'/g, "''")}'`;
+                        } else if (typeof param === 'number') {
+                            value = param.toString();
+                        } else {
+                            value = `'${String(param).replace(/'/g, "''")}'`;
+                        }
+                        processedQuery = processedQuery.replace(placeholder, value);
+                    });
+                    
+                    console.log('Executing query:', processedQuery);
+                    
+                    // Use Neon's serverless HTTP endpoint
+                    const response = await fetch(`https://${NEON_HOST}/sql`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Neon-Connection-String': DATABASE_URL
+                        },
+                        body: JSON.stringify({
+                            query: processedQuery,
+                            params: []
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Neon API error:', response.status, errorText);
+                        return null;
+                    }
+                    
+                    const data = await response.json();
+                    console.log('DB Query result:', data);
+                    
+                    // Parse the response - Neon returns fields and rows
+                    if (data.fields && data.rows) {
+                        // Convert array rows to objects using field names
+                        const rows = data.rows.map(row => {
+                            const obj = {};
+                            data.fields.forEach((field, i) => {
+                                obj[field.name] = row[i];
+                            });
+                            return obj;
+                        });
+                        return { rows };
+                    }
+                    return { rows: [] };
                 } catch (err) {
                     console.error('Database query failed:', err);
                     return null;
