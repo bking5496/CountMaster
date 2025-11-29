@@ -34,8 +34,8 @@
         // =====================
         const DATABASE_URL = 'postgresql://neondb_owner:npg_ZgY7c2jDrizh@ep-restless-river-aey5vyvy-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require';
         
-        // Create the SQL query function
-        const sql = neon(DATABASE_URL);
+        // Create the SQL query function with fullResults option for proper result handling
+        const sql = neon(DATABASE_URL, { fullResults: true });
 
         // Database helper functions using Neon Serverless Driver
         const db = {
@@ -46,7 +46,7 @@
                     // Use sql.query() for parameterized queries
                     const result = await sql.query(queryText, params);
                     console.log('DB Query result:', result);
-                    return { rows: result.rows || result };
+                    return { rows: result.rows || [] };
                 } catch (err) {
                     console.error('Database query failed:', err);
                     return null;
