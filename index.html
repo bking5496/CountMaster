@@ -35,17 +35,20 @@
         const NEON_USER = 'neondb_owner';
         const NEON_PASSWORD = 'npg_ZgY7c2jDrizh';
 
-        // Database helper functions using Neon HTTP API
+        // Database helper functions using Neon Serverless HTTP API
         const db = {
             connected: false,
             
             async query(sql, params = []) {
                 try {
+                    // Use Neon's serverless driver HTTP endpoint
+                    const connectionString = `postgresql://${NEON_USER}:${NEON_PASSWORD}@${NEON_HOST}/${NEON_DATABASE}?sslmode=require`;
+                    
                     const response = await fetch(`https://${NEON_HOST}/sql`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Neon-Connection-String': `postgresql://${NEON_USER}:${NEON_PASSWORD}@${NEON_HOST}/${NEON_DATABASE}?sslmode=require`
+                            'Neon-Connection-String': connectionString
                         },
                         body: JSON.stringify({
                             query: sql,
@@ -55,11 +58,12 @@
                     
                     if (!response.ok) {
                         const errorText = await response.text();
-                        console.error('Neon HTTP error:', errorText);
+                        console.error('Neon HTTP error:', response.status, errorText);
                         return null;
                     }
                     
                     const result = await response.json();
+                    console.log('DB Query result:', result);
                     return result;
                 } catch (err) {
                     console.error('Database query failed:', err);
@@ -115,20 +119,27 @@
             
             async getStockScans(date) {
                 if (!this.connected) return [];
+                console.log('Loading scans for date:', date);
                 const result = await this.query(
                     `SELECT * FROM stock_scans WHERE take_date = $1 ORDER BY scanned_at DESC`,
                     [date]
                 );
+                console.log('Loaded scans:', result);
                 return result?.rows || [];
             },
             
             async insertStockScan(scan) {
-                if (!this.connected) return false;
+                if (!this.connected) {
+                    console.log('DB not connected, cannot insert');
+                    return false;
+                }
+                console.log('Inserting scan:', scan);
                 const result = await this.query(
                     `INSERT INTO stock_scans (take_date, batch_number, pallet_number, cases_on_pallet, actual_cases, stock_code, description, raw_code, device_id, scanned_by) 
                      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
                     [scan.take_date, scan.batch_number, scan.pallet_number, scan.cases_on_pallet, scan.actual_cases, scan.stock_code, scan.description, scan.raw_code, scan.device_id, scan.scanned_by || 'Unknown']
                 );
+                console.log('Insert scan result:', result);
                 return result !== null;
             },
             
@@ -547,8 +558,10 @@
 
             async saveScan(parsedData, actualCases) {
                 const userName = getUserName();
+                console.log('Saving scan:', { parsedData, actualCases, userName, useNeonDB: this.useNeonDB });
+                
                 if (this.useNeonDB) {
-                    await db.insertStockScan({
+                    const result = await db.insertStockScan({
                         take_date: this.currentTakeDate,
                         batch_number: parsedData.batchNumber,
                         pallet_number: parsedData.palletNumber,
@@ -560,6 +573,7 @@
                         device_id: DEVICE_ID,
                         scanned_by: userName
                     });
+                    console.log('Insert result:', result);
                 } else {
                     const scan = {
                         id: 'scan:' + Date.now(),
@@ -598,16 +612,21 @@
                 this.render();
             }
 
-            submitCaseCount() {
+            async submitCaseCount() {
                 const input = document.getElementById('caseInput');
                 const actualCases = parseInt(input.value);
                 
-                if (!actualCases || actualCases < 0) {
+                if (isNaN(actualCases) || actualCases < 0) {
                     alert('Please enter a valid number of cases');
                     return;
                 }
                 
-                this.saveScan(this.currentScan, actualCases);
+                try {
+                    await this.saveScan(this.currentScan, actualCases);
+                } catch (err) {
+                    console.error('Save scan error:', err);
+                    alert('Failed to save scan. Please try again.');
+                }
             }
 
             cancelCaseEntry() {
