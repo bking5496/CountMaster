@@ -8,7 +8,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- ==========================================
 -- Core stock_scans table additions
 -- ==========================================
-ALTER TABLE IF EXISTS stock_scans
+ALTER TABLE IF EXISTS public.stock_scans
     ADD COLUMN IF NOT EXISTS session_id text,
     ADD COLUMN IF NOT EXISTS session_type text DEFAULT 'FP',
     ADD COLUMN IF NOT EXISTS expiry_date date,
@@ -23,18 +23,51 @@ ALTER TABLE IF EXISTS stock_scans
     ADD COLUMN IF NOT EXISTS created_by text,
     ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 
-ALTER TABLE IF EXISTS stock_scans
+ALTER TABLE IF EXISTS public.stock_scans
     ADD COLUMN IF NOT EXISTS scanned_at timestamptz DEFAULT now();
 
-CREATE INDEX IF NOT EXISTS idx_stock_scans_session_id ON stock_scans(session_id);
-CREATE INDEX IF NOT EXISTS idx_stock_scans_session_type ON stock_scans(session_type);
-CREATE INDEX IF NOT EXISTS idx_stock_scans_batch_pallet ON stock_scans(batch_number, pallet_number);
-CREATE INDEX IF NOT EXISTS idx_stock_scans_location_zone ON stock_scans(location_zone_id);
+DO $$ BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+                WHERE table_schema = 'public'
+                    AND table_name = 'stock_scans'
+          AND column_name = 'session_id'
+    ) THEN
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_stock_scans_session_id ON public.stock_scans(session_id)';
+    END IF;
+END $$;
+
+DO $$ BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+                WHERE table_schema = 'public'
+                    AND table_name = 'stock_scans'
+          AND column_name = 'session_type'
+    ) THEN
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_stock_scans_session_type ON public.stock_scans(session_type)';
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_stock_scans_batch_pallet ON public.stock_scans(batch_number, pallet_number);
+
+DO $$ BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+                WHERE table_schema = 'public'
+                    AND table_name = 'stock_scans'
+          AND column_name = 'location_zone_id'
+    ) THEN
+                EXECUTE 'CREATE INDEX IF NOT EXISTS idx_stock_scans_location_zone ON public.stock_scans(location_zone_id)';
+    END IF;
+END $$;
 
 -- ==========================================
 -- Session metadata + lifecycle tables
 -- ==========================================
-CREATE TABLE IF NOT EXISTS stock_takes (
+CREATE TABLE IF NOT EXISTS public.stock_takes (
     id text PRIMARY KEY,
     session_type text NOT NULL,
     session_number integer NOT NULL,
@@ -48,11 +81,49 @@ CREATE TABLE IF NOT EXISTS stock_takes (
     metadata jsonb DEFAULT '{}'::jsonb
 );
 
-CREATE INDEX IF NOT EXISTS idx_stock_takes_date_type ON stock_takes(take_date, session_type);
+ALTER TABLE IF EXISTS public.stock_takes
+    ADD COLUMN IF NOT EXISTS id text;
 
-CREATE TABLE IF NOT EXISTS session_devices (
+DO $$
+BEGIN
+    UPDATE public.stock_takes
+    SET id = gen_random_uuid()::text
+    WHERE id IS NULL;
+END $$;
+
+ALTER TABLE IF EXISTS public.stock_takes
+    ALTER COLUMN id SET NOT NULL;
+
+ALTER TABLE IF EXISTS public.stock_takes
+    ALTER COLUMN id SET DEFAULT gen_random_uuid()::text;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conrelid = 'public.stock_takes'::regclass
+          AND conname = 'stock_takes_id_key'
+    ) THEN
+        ALTER TABLE public.stock_takes
+            ADD CONSTRAINT stock_takes_id_key UNIQUE (id);
+    END IF;
+END $$;
+
+ALTER TABLE IF EXISTS public.stock_takes
+    ADD COLUMN IF NOT EXISTS session_type text DEFAULT 'FP';
+
+ALTER TABLE IF EXISTS public.stock_takes
+    ALTER COLUMN session_type SET NOT NULL;
+
+ALTER TABLE IF EXISTS public.stock_takes
+    ALTER COLUMN session_type DROP DEFAULT;
+
+CREATE INDEX IF NOT EXISTS idx_stock_takes_date_type ON public.stock_takes(take_date, session_type);
+
+CREATE TABLE IF NOT EXISTS public.session_devices (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    session_id text REFERENCES stock_takes(id) ON DELETE CASCADE,
+    session_id text REFERENCES public.stock_takes(id) ON DELETE CASCADE,
     device_id text NOT NULL,
     user_name text,
     role text DEFAULT 'operator',
@@ -63,9 +134,9 @@ CREATE TABLE IF NOT EXISTS session_devices (
     UNIQUE(session_id, device_id)
 );
 
-CREATE TABLE IF NOT EXISTS session_status_events (
+CREATE TABLE IF NOT EXISTS public.session_status_events (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    session_id text REFERENCES stock_takes(id) ON DELETE CASCADE,
+    session_id text REFERENCES public.stock_takes(id) ON DELETE CASCADE,
     previous_status text,
     next_status text NOT NULL,
     reason text,
@@ -78,7 +149,7 @@ CREATE TABLE IF NOT EXISTS session_status_events (
 -- ==========================================
 -- Location hierarchy tables
 -- ==========================================
-CREATE TABLE IF NOT EXISTS location_zones (
+CREATE TABLE IF NOT EXISTS public.location_zones (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     site text NOT NULL,
     aisle text NOT NULL,
@@ -88,14 +159,21 @@ CREATE TABLE IF NOT EXISTS location_zones (
     created_at timestamptz DEFAULT now()
 );
 
-ALTER TABLE IF EXISTS stock_scans
-    ADD CONSTRAINT IF NOT EXISTS fk_stock_scans_location_zone
-    FOREIGN KEY (location_zone_id) REFERENCES location_zones(id);
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'fk_stock_scans_location_zone'
+    ) THEN
+        ALTER TABLE IF EXISTS public.stock_scans
+            ADD CONSTRAINT fk_stock_scans_location_zone
+            FOREIGN KEY (location_zone_id) REFERENCES public.location_zones(id);
+    END IF;
+END $$;
 
 -- ==========================================
 -- Audit + logging tables
 -- ==========================================
-CREATE TABLE IF NOT EXISTS scan_audit_logs (
+CREATE TABLE IF NOT EXISTS public.scan_audit_logs (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     scan_id text,
     action text NOT NULL,
@@ -106,7 +184,7 @@ CREATE TABLE IF NOT EXISTS scan_audit_logs (
     created_at timestamptz DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS event_logs (
+CREATE TABLE IF NOT EXISTS public.event_logs (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     event_type text NOT NULL,
     severity text DEFAULT 'info',
@@ -119,7 +197,7 @@ CREATE TABLE IF NOT EXISTS event_logs (
 -- ==========================================
 -- Role management + helpers
 -- ==========================================
-CREATE TABLE IF NOT EXISTS app_roles (
+CREATE TABLE IF NOT EXISTS public.app_roles (
     user_id uuid PRIMARY KEY,
     email text,
     role text NOT NULL CHECK (role IN ('operator','supervisor','admin')),
@@ -177,9 +255,9 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_validate_stock_scan ON stock_scans;
+DROP TRIGGER IF EXISTS trg_validate_stock_scan ON public.stock_scans;
 CREATE TRIGGER trg_validate_stock_scan
-BEFORE INSERT OR UPDATE ON stock_scans
+BEFORE INSERT OR UPDATE ON public.stock_scans
 FOR EACH ROW EXECUTE FUNCTION validate_stock_scan();
 
 CREATE OR REPLACE FUNCTION log_scan_audit()
@@ -200,9 +278,9 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_scan_audit ON stock_scans;
+DROP TRIGGER IF EXISTS trg_scan_audit ON public.stock_scans;
 CREATE TRIGGER trg_scan_audit
-AFTER UPDATE OR DELETE ON stock_scans
+AFTER UPDATE OR DELETE ON public.stock_scans
 FOR EACH ROW EXECUTE FUNCTION log_scan_audit();
 
 -- ==========================================
@@ -258,28 +336,28 @@ $$;
 -- ==========================================
 -- RLS policies
 -- ==========================================
-ALTER TABLE stock_scans ENABLE ROW LEVEL SECURITY;
-ALTER TABLE stock_takes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE session_devices ENABLE ROW LEVEL SECURITY;
-ALTER TABLE scan_audit_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE event_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stock_scans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stock_takes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.session_devices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.scan_audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.event_logs ENABLE ROW LEVEL SECURITY;
 
 -- stock_scans
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'stock_scans' AND policyname = 'stock_scans_select') THEN
-        CREATE POLICY stock_scans_select ON stock_scans
+        CREATE POLICY stock_scans_select ON public.stock_scans
             FOR SELECT USING (current_app_role() IN ('operator','supervisor','admin'));
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'stock_scans' AND policyname = 'stock_scans_insert') THEN
-        CREATE POLICY stock_scans_insert ON stock_scans
+        CREATE POLICY stock_scans_insert ON public.stock_scans
             FOR INSERT WITH CHECK (current_app_role() IN ('operator','supervisor','admin'));
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'stock_scans' AND policyname = 'stock_scans_update') THEN
-        CREATE POLICY stock_scans_update ON stock_scans
+        CREATE POLICY stock_scans_update ON public.stock_scans
             FOR UPDATE USING (current_app_role() IN ('supervisor','admin')) WITH CHECK (current_app_role() IN ('supervisor','admin'));
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'stock_scans' AND policyname = 'stock_scans_delete') THEN
-        CREATE POLICY stock_scans_delete ON stock_scans
+        CREATE POLICY stock_scans_delete ON public.stock_scans
             FOR DELETE USING (current_app_role() IN ('supervisor','admin'));
     END IF;
 END $$;
@@ -287,7 +365,7 @@ END $$;
 -- stock_takes policies
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'stock_takes' AND policyname = 'stock_takes_upsert') THEN
-        CREATE POLICY stock_takes_upsert ON stock_takes
+        CREATE POLICY stock_takes_upsert ON public.stock_takes
             FOR ALL USING (current_app_role() IN ('operator','supervisor','admin')) WITH CHECK (current_app_role() IN ('operator','supervisor','admin'));
     END IF;
 END $$;
@@ -295,7 +373,7 @@ END $$;
 -- session_devices policies
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'session_devices' AND policyname = 'session_devices_rw') THEN
-        CREATE POLICY session_devices_rw ON session_devices
+        CREATE POLICY session_devices_rw ON public.session_devices
             FOR ALL USING (current_app_role() IN ('operator','supervisor','admin')) WITH CHECK (current_app_role() IN ('operator','supervisor','admin'));
     END IF;
 END $$;
@@ -303,11 +381,11 @@ END $$;
 -- audit + event logs read-only for supervisors
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'scan_audit_logs' AND policyname = 'scan_audit_logs_select') THEN
-        CREATE POLICY scan_audit_logs_select ON scan_audit_logs
+        CREATE POLICY scan_audit_logs_select ON public.scan_audit_logs
             FOR SELECT USING (current_app_role() IN ('supervisor','admin'));
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'event_logs' AND policyname = 'event_logs_select') THEN
-        CREATE POLICY event_logs_select ON event_logs
+        CREATE POLICY event_logs_select ON public.event_logs
             FOR SELECT USING (current_app_role() IN ('supervisor','admin'));
     END IF;
 END $$;
