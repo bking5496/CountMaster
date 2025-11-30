@@ -785,16 +785,22 @@
         }
 
         async function saveSessionToSupabase(session) {
-            if (!supabaseSessionsEnabled || !session) return;
+            if (!supabaseSessionsEnabled || !session) return true;
             try {
                 const payload = buildSupabaseSessionPayload(session);
                 const { error } = await supabase
                     .from('stock_takes')
                     .upsert(payload, { onConflict: 'id' });
                 if (error) throw error;
+                return true;
             } catch (err) {
                 console.error('Failed to save session to Supabase:', err);
-                await logClientEvent('session-save-failed', 'error', session?.id || null, { message: err.message });
+                await logClientEvent('session-save-failed', 'error', session?.id || null, {
+                    message: err?.message || 'unknown error',
+                    code: err?.code || null,
+                    details: err?.details || null
+                });
+                return false;
             }
         }
 
@@ -830,19 +836,56 @@
             }
         }
 
-        async function upsertSessionDevicePresence(sessionId, status = 'active') {
+        async function upsertSessionDevicePresence(sessionId, status = 'active', sessionSnapshot = null) {
             if (!supabaseSessionsEnabled || !sessionId) return;
-            try {
-                await supabase.rpc('upsert_session_device', {
+
+            const invokeHeartbeat = async () => {
+                const { error } = await supabase.rpc('upsert_session_device', {
                     p_session_id: sessionId,
                     p_device_id: DEVICE_ID,
                     p_user_name: getUserName() || 'Unknown',
                     p_role: 'operator',
                     p_status: status
                 });
+                if (error) throw error;
+            };
+
+            const isMissingSessionError = (err) => {
+                if (!err) return false;
+                if (err.code === '23503') return true; // foreign key violation
+                return typeof err.message === 'string' && err.message.includes('session_devices_session_id_fkey');
+            };
+
+            try {
+                await invokeHeartbeat();
             } catch (err) {
+                if (isMissingSessionError(err) && sessionSnapshot) {
+                    console.warn('Heartbeat failed because session is missing in Supabase. Attempting to re-save session before retrying.');
+                    const saved = await saveSessionToSupabase(sessionSnapshot);
+                    if (saved) {
+                        await new Promise((resolve) => setTimeout(resolve, 300));
+                        try {
+                            await invokeHeartbeat();
+                            return;
+                        } catch (retryErr) {
+                            console.error('Heartbeat retry still failing:', retryErr);
+                            await logClientEvent('heartbeat-retry-failed', 'error', sessionId, {
+                                status,
+                                message: retryErr?.message || 'retry failed',
+                                code: retryErr?.code || null
+                            });
+                            return;
+                        }
+                    }
+                }
+
                 console.error('Heartbeat failed:', err);
-                await logClientEvent('heartbeat-failed', 'warning', sessionId, { status, message: err.message });
+                await logClientEvent('heartbeat-failed', 'warning', sessionId, {
+                    status,
+                    message: err?.message || 'unknown error',
+                    code: err?.code || null,
+                    details: err?.details || null
+                });
             }
         }
 
@@ -1392,7 +1435,7 @@
                 this.stopHeartbeat();
                 const send = async () => {
                     if (!this.isBrowserOnline) return;
-                    await upsertSessionDevicePresence(this.activeStockTake.id, status);
+                    await upsertSessionDevicePresence(this.activeStockTake.id, status, this.activeStockTake);
                     this.lastHeartbeatAt = Date.now();
                 };
                 send();
@@ -1405,7 +1448,7 @@
                     this.heartbeatInterval = null;
                 }
                 if (supabaseSessionsEnabled && this.activeStockTake?.id && status && this.isBrowserOnline) {
-                    upsertSessionDevicePresence(this.activeStockTake.id, status);
+                    upsertSessionDevicePresence(this.activeStockTake.id, status, this.activeStockTake);
                 }
             }
 
