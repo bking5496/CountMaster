@@ -1030,9 +1030,10 @@
 
             updateLocationHierarchy(level, value) {
                 if (!['site', 'aisle', 'rack'].includes(level)) return;
-                this.sessionSettings[level] = value.trim();
+                this.sessionSettings[level] = value;
                 saveSessionSettings(this.sessionSettings);
-                this.render();
+                // Don't re-render here - it causes the input to lose focus
+                // The value is already saved, and the UI will update on next render
             }
             
             promptForLocation() {
