@@ -4019,7 +4019,7 @@
                                                 <div class="text-2xl font-black ${isExpired ? 'text-red-600' : (scan.actualCases !== scan.casesOnPallet ? 'text-amber-600' : 'text-emerald-600')}">
                                                     ${scan.actualCases}
                                                 </div>
-                                                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Cases</div>
+                                                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">${scan.unitType === 'kg' ? 'KG' : (scan.unitType === 'units' ? 'UN' : 'Cases')}</div>
                                             </div>
                                             
                                             <button onclick="app.deleteScan('${scan.id}')" class="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
