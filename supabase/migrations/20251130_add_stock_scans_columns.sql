@@ -82,7 +82,17 @@ CREATE TABLE IF NOT EXISTS public.stock_takes (
 );
 
 ALTER TABLE IF EXISTS public.stock_takes
-    ADD COLUMN IF NOT EXISTS id text;
+    ADD COLUMN IF NOT EXISTS id text,
+    ADD COLUMN IF NOT EXISTS session_type text DEFAULT 'FP',
+    ADD COLUMN IF NOT EXISTS session_number integer DEFAULT 1,
+    ADD COLUMN IF NOT EXISTS take_date date DEFAULT current_date,
+    ADD COLUMN IF NOT EXISTS status text DEFAULT 'active',
+    ADD COLUMN IF NOT EXISTS started_by text,
+    ADD COLUMN IF NOT EXISTS started_at timestamptz DEFAULT now(),
+    ADD COLUMN IF NOT EXISTS paused_at timestamptz,
+    ADD COLUMN IF NOT EXISTS resumed_at timestamptz,
+    ADD COLUMN IF NOT EXISTS completed_at timestamptz,
+    ADD COLUMN IF NOT EXISTS metadata jsonb DEFAULT '{}'::jsonb;
 
 DO $$
 BEGIN
@@ -111,13 +121,25 @@ BEGIN
 END $$;
 
 ALTER TABLE IF EXISTS public.stock_takes
-    ADD COLUMN IF NOT EXISTS session_type text DEFAULT 'FP';
-
-ALTER TABLE IF EXISTS public.stock_takes
     ALTER COLUMN session_type SET NOT NULL;
 
 ALTER TABLE IF EXISTS public.stock_takes
     ALTER COLUMN session_type DROP DEFAULT;
+
+ALTER TABLE IF EXISTS public.stock_takes
+    ALTER COLUMN session_number SET NOT NULL;
+
+ALTER TABLE IF EXISTS public.stock_takes
+    ALTER COLUMN session_number DROP DEFAULT;
+
+ALTER TABLE IF EXISTS public.stock_takes
+    ALTER COLUMN take_date SET NOT NULL;
+
+ALTER TABLE IF EXISTS public.stock_takes
+    ALTER COLUMN take_date DROP DEFAULT;
+
+ALTER TABLE IF EXISTS public.stock_takes
+    ALTER COLUMN status SET DEFAULT 'active';
 
 CREATE INDEX IF NOT EXISTS idx_stock_takes_date_type ON public.stock_takes(take_date, session_type);
 
