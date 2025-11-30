@@ -1001,6 +1001,10 @@
             get useNeonDB() {
                 return db.mode === 'netlify';
             }
+
+            get usingSupabaseDB() {
+                return db.mode === 'supabase';
+            }
             
             toggleLocationScanning() {
                 this.sessionSettings.locationScanningEnabled = !this.sessionSettings.locationScanningEnabled;
@@ -2301,7 +2305,12 @@
                     if (!this.syncInterval) {
                         this.startAutoSync();
                     }
-                    alert('✓ Connected to Neon DB successfully!');
+                    const modeLabel = db.mode === 'supabase' ? 'Supabase' : (db.mode === 'netlify' ? 'Neon DB' : 'local cache');
+                    if (db.mode === 'localStorage') {
+                        alert('Connected in offline mode. Data will sync once Supabase is reachable.');
+                    } else {
+                        alert(`✓ Connected to ${modeLabel} successfully!`);
+                    }
                 } else {
                     alert('✗ Connection failed. Check browser console for details.');
                 }
@@ -3491,19 +3500,54 @@
                                         <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
                                             Connection Status
                                         </label>
-                                        <div class="px-4 py-4 border rounded-xl ${this.useNeonDB ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}">
-                                            <div class="flex items-center gap-3">
-                                                <div class="w-3 h-3 rounded-full ${this.useNeonDB ? 'bg-emerald-500' : 'bg-amber-500'}"></div>
-                                                <div>
-                                                    <div class="font-bold text-sm ${this.useNeonDB ? 'text-emerald-800' : 'text-amber-800'}">
-                                                        ${this.useNeonDB ? 'Connected to Cloud' : 'Offline Mode'}
+                                        ${(() => {
+                                            const mode = this.useNeonDB ? 'netlify' : (this.usingSupabaseDB ? 'supabase' : 'offline');
+                                            const configs = {
+                                                netlify: {
+                                                    border: 'border-emerald-200 bg-emerald-50',
+                                                    dot: 'bg-emerald-500',
+                                                    title: 'Connected to Neon DB',
+                                                    titleClass: 'text-emerald-800',
+                                                    subtitle: 'Data is syncing through Netlify Functions',
+                                                    subtitleClass: 'text-emerald-600',
+                                                    note: null,
+                                                    noteClass: ''
+                                                },
+                                                supabase: {
+                                                    border: 'border-indigo-200 bg-indigo-50',
+                                                    dot: 'bg-indigo-500',
+                                                    title: 'Connected to Supabase',
+                                                    titleClass: 'text-indigo-800',
+                                                    subtitle: 'All scans sync directly to Supabase Postgres',
+                                                    subtitleClass: 'text-indigo-600',
+                                                    note: 'Session heartbeats, duplicate checks, and exports are using Supabase only.',
+                                                    noteClass: 'text-indigo-500'
+                                                },
+                                                offline: {
+                                                    border: 'border-amber-200 bg-amber-50',
+                                                    dot: 'bg-amber-500',
+                                                    title: 'Offline Mode',
+                                                    titleClass: 'text-amber-800',
+                                                    subtitle: 'Data stored locally on this device',
+                                                    subtitleClass: 'text-amber-600',
+                                                    note: 'Reconnect to sync with Supabase automatically.',
+                                                    noteClass: 'text-amber-600'
+                                                }
+                                            };
+                                            const cfg = configs[mode];
+                                            return `
+                                                <div class="px-4 py-4 border rounded-xl ${cfg.border}">
+                                                    <div class="flex items-center gap-3">
+                                                        <div class="w-3 h-3 rounded-full ${cfg.dot}"></div>
+                                                        <div>
+                                                            <div class="font-bold text-sm ${cfg.titleClass}">${cfg.title}</div>
+                                                            <div class="text-xs mt-0.5 ${cfg.subtitleClass}">${cfg.subtitle}</div>
+                                                        </div>
                                                     </div>
-                                                    <div class="text-xs mt-0.5 ${this.useNeonDB ? 'text-emerald-600' : 'text-amber-600'}">
-                                                        ${this.useNeonDB ? 'Data is syncing with Neon DB' : 'Data stored locally on device'}
-                                                    </div>
+                                                    ${cfg.note ? `<div class="mt-3 text-xs ${cfg.noteClass}">${cfg.note}</div>` : ''}
                                                 </div>
-                                            </div>
-                                        </div>
+                                            `;
+                                        })()}
                                     </div>
                                     
                                     <div class="pt-2 space-y-3">
