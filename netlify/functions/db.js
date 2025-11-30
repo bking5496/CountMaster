@@ -36,8 +36,8 @@ exports.handler = async (event) => {
           CREATE TABLE IF NOT EXISTS stock_scans (
             id BIGSERIAL PRIMARY KEY,
             take_date DATE NOT NULL,
-            batch_number VARCHAR(5),
-            pallet_number VARCHAR(2),
+            batch_number TEXT,
+            pallet_number TEXT,
             cases_on_pallet INT,
             actual_cases NUMERIC(18,4),
             stock_code VARCHAR(50),
