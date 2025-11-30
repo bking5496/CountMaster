@@ -29,6 +29,7 @@
 <body class="bg-slate-50 text-slate-900 min-h-screen font-sans antialiased selection:bg-indigo-100 selection:text-indigo-700">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <div id="app" class="max-w-md mx-auto min-h-screen bg-white shadow-2xl shadow-slate-200 overflow-hidden relative"></div>
+    <div id="modal-root" class="relative z-50"></div>
 
     <script>
         // ===========================================
@@ -995,6 +996,9 @@
                 this.lastSessionSync = 0;
                 this.isBrowserOnline = navigator.onLine;
                 
+                // Modal State
+                this.modalState = null; // { title, message, type, fields, onConfirm, onCancel, confirmText, cancelText }
+                
                 this.init();
             }
 
@@ -1032,10 +1036,20 @@
             }
             
             promptForLocation() {
-                const location = prompt('Enter Location (e.g., Rack A1, Floor 1, Bin 23):', this.sessionSettings.currentLocation || '');
-                if (location !== null) {
-                    this.setLocation(location.trim());
-                }
+                this.showModal({
+                    title: 'Set Location',
+                    message: 'Enter current location (e.g., Rack A1, Floor 1):',
+                    type: 'input',
+                    confirmText: 'Set Location',
+                    onConfirm: (data) => {
+                        this.setLocation(data.value.trim());
+                    }
+                });
+                // Pre-fill value
+                setTimeout(() => {
+                    const input = document.getElementById('modal-input');
+                    if (input) input.value = this.sessionSettings.currentLocation || '';
+                }, 50);
             }
 
             triggerHaptic(type = 'light') {
@@ -1988,29 +2002,49 @@
                     return;
                 }
 
-                if ((this.activeStockTake?.sessionType === 'RM' || this.currentScan?.isRawMaterial) && !this.currentScan?.expiryDate) {
-                    const manualExpiry = prompt('Enter expiry date (YYYY-MM-DD) or leave blank to continue without one:', '');
-                    if (manualExpiry && manualExpiry.trim() !== '') {
-                        const parsedDate = new Date(manualExpiry.trim());
-                        if (isNaN(parsedDate.getTime())) {
-                            alert('Invalid expiry date format. Please use YYYY-MM-DD.');
-                            return;
-                        }
-                        this.currentScan.expiryDate = parsedDate.toISOString().split('T')[0];
-                    } else {
-                        const proceed = confirm('No expiry date will be recorded for this raw material. Continue?');
-                        if (!proceed) {
-                            return;
-                        }
+                const save = async () => {
+                    try {
+                        await this.saveScan(this.currentScan, actualCases);
+                    } catch (err) {
+                        console.error('Save scan error:', err);
+                        alert('Failed to save scan. Please try again.');
                     }
+                };
+
+                if ((this.activeStockTake?.sessionType === 'RM' || this.currentScan?.isRawMaterial) && !this.currentScan?.expiryDate) {
+                    this.showModal({
+                        title: 'Expiry Date Required',
+                        message: 'Enter expiry date (YYYY-MM-DD) or leave blank:',
+                        type: 'input',
+                        confirmText: 'Continue',
+                        onConfirm: (data) => {
+                            const manualExpiry = data.value;
+                            if (manualExpiry && manualExpiry.trim() !== '') {
+                                const parsedDate = new Date(manualExpiry.trim());
+                                if (isNaN(parsedDate.getTime())) {
+                                    alert('Invalid expiry date format. Please use YYYY-MM-DD.');
+                                    return;
+                                }
+                                this.currentScan.expiryDate = parsedDate.toISOString().split('T')[0];
+                                save();
+                            } else {
+                                this.showModal({
+                                    title: 'Confirm No Expiry',
+                                    message: 'No expiry date will be recorded. Continue?',
+                                    type: 'confirm',
+                                    confirmText: 'Yes, Continue',
+                                    cancelText: 'Go Back',
+                                    onConfirm: () => {
+                                        save();
+                                    }
+                                });
+                            }
+                        }
+                    });
+                    return;
                 }
                 
-                try {
-                    await this.saveScan(this.currentScan, actualCases);
-                } catch (err) {
-                    console.error('Save scan error:', err);
-                    alert('Failed to save scan. Please try again.');
-                }
+                await save();
             }
 
             cancelCaseEntry() {
@@ -2022,24 +2056,40 @@
             async toggleSessionPause() {
                 if (!this.activeStockTake?.id) return;
                 const nextStatus = this.activeStockTake.status === 'paused' ? 'active' : 'paused';
-                const reason = nextStatus === 'paused' ? prompt('Reason for pausing this session? (optional)', '') || 'Paused manually' : 'Resumed manually';
-                if (supabaseSessionsEnabled) {
-                    await changeSessionStatusSupabase(this.activeStockTake, nextStatus, reason, {});
-                } else {
-                    await updateSession(this.activeStockTake.date, this.activeStockTake.id, { status: nextStatus });
-                }
-                this.activeStockTake = { ...this.activeStockTake, status: nextStatus };
-                setActiveStockTake(this.activeStockTake);
-                if (nextStatus === 'paused') {
-                    this.stopHeartbeat('paused');
-                    this.triggerHaptic('warning');
-                } else {
+                
+                const processStatusChange = async (reason) => {
                     if (supabaseSessionsEnabled) {
-                        this.startHeartbeat('active');
+                        await changeSessionStatusSupabase(this.activeStockTake, nextStatus, reason, {});
+                    } else {
+                        await updateSession(this.activeStockTake.date, this.activeStockTake.id, { status: nextStatus });
                     }
-                    this.triggerHaptic('success');
+                    this.activeStockTake = { ...this.activeStockTake, status: nextStatus };
+                    setActiveStockTake(this.activeStockTake);
+                    if (nextStatus === 'paused') {
+                        this.stopHeartbeat('paused');
+                        this.triggerHaptic('warning');
+                    } else {
+                        if (supabaseSessionsEnabled) {
+                            this.startHeartbeat('active');
+                        }
+                        this.triggerHaptic('success');
+                    }
+                    this.render();
+                };
+
+                if (nextStatus === 'paused') {
+                    this.showModal({
+                        title: 'Pause Session',
+                        message: 'Reason for pausing (optional):',
+                        type: 'input',
+                        confirmText: 'Pause',
+                        onConfirm: (data) => {
+                            processStatusChange(data.value || 'Paused manually');
+                        }
+                    });
+                } else {
+                    await processStatusChange('Resumed manually');
                 }
-                this.render();
             }
             
             async selectExpiryDate(expiryDate) {
@@ -2104,10 +2154,17 @@
 
             manualEntry() {
                 this.stopScanning();
-                const code = prompt('Enter the 13-digit QR code manually:');
-                if (code && code.trim()) {
-                    this.onScanSuccess(code.trim());
-                }
+                this.showModal({
+                    title: 'Manual Entry',
+                    message: 'Enter the QR code manually:',
+                    type: 'input',
+                    confirmText: 'Process',
+                    onConfirm: (data) => {
+                        if (data.value && data.value.trim()) {
+                            this.onScanSuccess(data.value.trim());
+                        }
+                    }
+                });
             }
 
             showProductDatabase() {
@@ -2318,67 +2375,76 @@
                 this.render();
             }
 
-            async addProduct() {
-                const batch = prompt('Enter Batch Number (5 digits):');
-                if (!batch || !/^\d{5}$/.test(batch)) {
-                    alert('Invalid batch number');
-                    return;
-                }
-                
-                const stockCode = prompt('Enter Stock Code:');
-                if (!stockCode) return;
-                
-                const description = prompt('Enter Product Description:');
-                if (!description) return;
-                
-                productDatabase[batch] = { stockCode, description };
-                saveProductDatabase();
-                
-                // Also save to Supabase if available
-                await addProductToSupabase(batch, stockCode, description);
-                
-                alert('Product added!');
-                this.render();
+            addProduct() {
+                this.showModal({
+                    title: 'Add New Product',
+                    type: 'form',
+                    fields: [
+                        { name: 'batch', label: 'Batch Number', placeholder: '5 digits', required: true },
+                        { name: 'stockCode', label: 'Stock Code', placeholder: 'e.g. FP123', required: true },
+                        { name: 'description', label: 'Description', placeholder: 'Product name', required: true }
+                    ],
+                    confirmText: 'Add Product',
+                    onConfirm: async (data) => {
+                        const { batch, stockCode, description } = data;
+                        if (!/^\d{5}$/.test(batch)) {
+                            alert('Invalid batch number (must be 5 digits)');
+                            return;
+                        }
+                        
+                        productDatabase[batch] = { stockCode, description };
+                        saveProductDatabase();
+                        
+                        await addProductToSupabase(batch, stockCode, description);
+                        
+                        this.showModal({
+                            title: 'Success',
+                            message: 'Product added successfully!',
+                            type: 'alert'
+                        });
+                    }
+                });
             }
             
-            async addRawMaterial() {
-                const stockCode = prompt('Enter Stock Code (starts with letter):');
-                if (!stockCode || !/^[A-Za-z]/.test(stockCode)) {
-                    alert('Invalid stock code - must start with a letter');
-                    return;
-                }
-                
-                const description = prompt('Enter Product Description:');
-                if (!description) return;
-                
-                const batchNumber = prompt('Enter Batch Number (optional):') || '';
-                
-                let expiryDate = null;
-                const hasExpiry = confirm('Does this product have an expiry date?');
-                if (hasExpiry) {
-                    expiryDate = prompt('Enter Expiry Date (YYYY-MM-DD):');
-                    if (expiryDate && !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) {
-                        alert('Invalid date format. Use YYYY-MM-DD');
-                        return;
+            addRawMaterial() {
+                this.showModal({
+                    title: 'Add Raw Material',
+                    type: 'form',
+                    fields: [
+                        { name: 'stockCode', label: 'Stock Code', placeholder: 'Starts with letter', required: true },
+                        { name: 'description', label: 'Description', placeholder: 'Material name', required: true },
+                        { name: 'batchNumber', label: 'Batch Number (Optional)', placeholder: 'e.g. B123', required: false },
+                        { name: 'expiryDate', label: 'Expiry Date (Optional)', placeholder: 'YYYY-MM-DD', type: 'date', required: false }
+                    ],
+                    confirmText: 'Add Material',
+                    onConfirm: async (data) => {
+                        const { stockCode, description, batchNumber, expiryDate } = data;
+                        
+                        if (!/^[A-Za-z]/.test(stockCode)) {
+                            alert('Invalid stock code - must start with a letter');
+                            return;
+                        }
+                        
+                        // Add to database
+                        if (!rawMaterialsDatabase[stockCode]) {
+                            rawMaterialsDatabase[stockCode] = { description, batches: {} };
+                        }
+                        if (batchNumber) {
+                            rawMaterialsDatabase[stockCode].batches[batchNumber] = { expiryDate: expiryDate || null };
+                        }
+                        rawMaterialsDatabase[stockCode].description = description;
+                        
+                        saveRawMaterialsDatabase();
+                        
+                        await addRawMaterialToSupabase(stockCode, description, batchNumber, expiryDate);
+                        
+                        this.showModal({
+                            title: 'Success',
+                            message: 'Raw Material added successfully!',
+                            type: 'alert'
+                        });
                     }
-                }
-                
-                // Add to database
-                if (!rawMaterialsDatabase[stockCode]) {
-                    rawMaterialsDatabase[stockCode] = { description, batches: {} };
-                }
-                if (batchNumber) {
-                    rawMaterialsDatabase[stockCode].batches[batchNumber] = { expiryDate };
-                }
-                rawMaterialsDatabase[stockCode].description = description;
-                
-                saveRawMaterialsDatabase();
-                
-                // Also save to Supabase if available
-                await addRawMaterialToSupabase(stockCode, description, batchNumber, expiryDate);
-                
-                alert('Raw Material added!');
-                this.render();
+                });
             }
 
             async refreshProductsFromCloud() {
@@ -2418,11 +2484,18 @@
             }
             
             clearRMDatabase() {
-                if (confirm('Are you sure you want to clear all raw materials? This cannot be undone.')) {
-                    rawMaterialsDatabase = {};
-                    saveRawMaterialsDatabase();
-                    this.render();
-                }
+                this.showModal({
+                    title: 'Clear Raw Materials',
+                    message: 'Are you sure you want to clear all raw materials? This cannot be undone.',
+                    type: 'confirm',
+                    confirmText: 'Clear',
+                    cancelText: 'Cancel',
+                    onConfirm: () => {
+                        rawMaterialsDatabase = {};
+                        saveRawMaterialsDatabase();
+                        this.render();
+                    }
+                });
             }
 
             uploadExcel() {
@@ -2586,15 +2659,161 @@
             }
 
             clearDatabase() {
-                if (!confirm('Clear entire product database?')) return;
-                productDatabase = {};
-                saveProductDatabase();
-                alert('Database cleared');
+                this.showModal({
+                    title: 'Clear Database',
+                    message: 'Are you sure you want to clear the entire product database?',
+                    type: 'confirm',
+                    confirmText: 'Clear',
+                    cancelText: 'Cancel',
+                    onConfirm: () => {
+                        productDatabase = {};
+                        saveProductDatabase();
+                        this.showModal({ title: 'Success', message: 'Database cleared', type: 'alert' });
+                        this.render();
+                    }
+                });
+            }
+
+            showModal(config) {
+                this.modalState = {
+                    title: config.title || 'Alert',
+                    message: config.message || '',
+                    type: config.type || 'alert', // alert, confirm, input, form
+                    fields: config.fields || [], // [{name, label, type, value, placeholder, required}]
+                    confirmText: config.confirmText || 'OK',
+                    cancelText: config.cancelText || 'Cancel',
+                    onConfirm: config.onConfirm || (() => {}),
+                    onCancel: config.onCancel || (() => {})
+                };
+                this.render();
+                
+                // Focus first input if applicable
+                setTimeout(() => {
+                    const firstInput = document.querySelector('#modal-content input');
+                    if (firstInput) firstInput.focus();
+                }, 100);
+            }
+
+            closeModal() {
+                this.modalState = null;
                 this.render();
             }
 
+            handleModalSubmit(e) {
+                e.preventDefault();
+                if (!this.modalState) return;
+                
+                const formData = {};
+                if (this.modalState.type === 'input') {
+                    const input = document.getElementById('modal-input');
+                    formData.value = input ? input.value : '';
+                } else if (this.modalState.type === 'form') {
+                    this.modalState.fields.forEach(field => {
+                        const input = document.getElementById(`modal-field-${field.name}`);
+                        if (input) {
+                            formData[field.name] = field.type === 'checkbox' ? input.checked : input.value;
+                        }
+                    });
+                }
+                
+                if (this.modalState.onConfirm) {
+                    this.modalState.onConfirm(formData);
+                }
+                this.closeModal();
+            }
+
+            renderModal() {
+                const root = document.getElementById('modal-root');
+                if (!this.modalState) {
+                    root.innerHTML = '';
+                    return;
+                }
+                
+                const { title, message, type, fields, confirmText, cancelText } = this.modalState;
+                
+                let content = '';
+                
+                if (type === 'input') {
+                    content = `
+                        <input type="text" id="modal-input" class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50/50 outline-none transition-all" placeholder="Enter value" autocomplete="off">
+                    `;
+                } else if (type === 'form') {
+                    content = fields.map(field => `
+                        <div class="mb-4">
+                            <label class="block text-sm font-bold text-slate-700 mb-2">${field.label}</label>
+                            ${field.type === 'checkbox' ? `
+                                <label class="flex items-center gap-3 p-3 border border-slate-200 rounded-xl bg-slate-50">
+                                    <input type="checkbox" id="modal-field-${field.name}" ${field.value ? 'checked' : ''} class="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500">
+                                    <span class="text-slate-700 font-medium">${field.placeholder || ''}</span>
+                                </label>
+                            ` : `
+                                <input 
+                                    type="${field.type || 'text'}" 
+                                    id="modal-field-${field.name}" 
+                                    value="${field.value || ''}" 
+                                    class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50/50 outline-none transition-all" 
+                                    placeholder="${field.placeholder || ''}"
+                                    ${field.required ? 'required' : ''}
+                                >
+                            `}
+                        </div>
+                    `).join('');
+                } else if (type === 'loading') {
+                    content = `
+                        <div class="flex flex-col items-center justify-center py-4">
+                            <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                            <p class="text-slate-600 font-medium">${message || 'Loading...'}</p>
+                        </div>
+                    `;
+                }
+                
+                root.innerHTML = `
+                    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" style="z-index: 9999;">
+                        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100">
+                            <div class="p-6">
+                                ${type !== 'loading' ? `<h3 class="text-xl font-bold text-slate-900 mb-2">${title}</h3>` : ''}
+                                ${message && type !== 'loading' ? `<p class="text-slate-500 mb-6">${message}</p>` : ''}
+                                
+                                <form id="modal-form" onsubmit="app.handleModalSubmit(event)">
+                                    <div id="modal-content" class="mb-6">
+                                        ${content}
+                                    </div>
+                                    
+                                    ${type !== 'loading' ? `
+                                    <div class="flex gap-3">
+                                        ${type !== 'alert' ? `
+                                            <button type="button" onclick="app.closeModal()" class="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors">
+                                                ${cancelText}
+                                            </button>
+                                        ` : ''}
+                                        <button type="submit" class="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 transition-all">
+                                            ${confirmText}
+                                        </button>
+                                    </div>
+                                    ` : ''}
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
             render() {
+                this.renderModal();
+                const scrollY = window.scrollY;
                 const app = document.getElementById('app');
+                
+                const updateView = (html) => {
+                    app.innerHTML = html;
+                    // Restore scroll position if we are in the main list view
+                    // (heuristic: if we are not showing a modal or special screen)
+                    if (!this.showingStartStockTake && !this.showingSettings && !this.showingProductDB && !this.showingRMProductDB && !this.showingSessionHistory) {
+                         window.scrollTo(0, scrollY);
+                    } else {
+                        window.scrollTo(0, 0);
+                    }
+                };
+
                 if (this.isScanning && document.getElementById('scanner-view')) {
                     return;
                 }
@@ -2606,7 +2825,7 @@
                 if (this.showingStartStockTake && !this.selectedStockTakeType) {
                     const savedName = getUserName();
                     
-                    app.innerHTML = `
+                    updateView(`
                         <div class="min-h-screen flex flex-col bg-white">
                             <div class="flex-1 flex flex-col items-center justify-center p-8">
                                 <div class="w-24 h-24 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-3xl flex items-center justify-center mb-8 shadow-lg shadow-indigo-200 transform -rotate-6">
@@ -2704,7 +2923,7 @@
                                 <p class="text-xs text-slate-400 mt-4">v1.0.0 • ${this.currentTakeDate}</p>
                             </div>
                         </div>
-                    `;
+                    `);
                     return;
                 }
                 
@@ -2715,7 +2934,7 @@
                     const isRM = sessionType === 'RM';
                     const activeSessions = getActiveSessionsForDate(this.currentTakeDate).filter(s => s.sessionType === sessionType);
                     
-                    app.innerHTML = `
+                    updateView(`
                         <div class="min-h-screen flex flex-col bg-white">
                             <!-- Header -->
                             <div class="p-4 border-b border-slate-100">
@@ -2829,12 +3048,12 @@
                                 <p class="text-xs text-slate-400">${this.currentTakeDate}</p>
                             </div>
                         </div>
-                    `;
+                    `);
                     return;
                 }
                 
                 if (this.isScanning) {
-                    app.innerHTML = `
+                    updateView(`
                         <div id="scanner-view" class="fixed inset-0 bg-black z-50 flex flex-col">
                             <!-- Scanner Header -->
                             <div class="absolute top-0 left-0 right-0 z-10 p-4 flex justify-between items-start bg-gradient-to-b from-black/50 to-transparent">
@@ -2871,7 +3090,7 @@
                                 </div>
                             </div>
                         </div>
-                    `;
+                    `);
                     return;
                 }
                 
@@ -2881,7 +3100,7 @@
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
                     
-                    app.innerHTML = `
+                    updateView(`
                         <div class="min-h-screen bg-slate-50 flex flex-col">
                             <div class="flex-1 p-6 flex flex-col justify-center max-w-md mx-auto w-full">
                                 <div class="bg-white rounded-3xl shadow-xl shadow-slate-200 overflow-hidden">
@@ -2952,7 +3171,7 @@
                                 </div>
                             </div>
                         </div>
-                    `;
+                    `);
                     return;
                 }
                 
@@ -2969,7 +3188,7 @@
                         isExpired = expiry <= today;
                         expiryDisplay = expiry.toLocaleDateString();
                     }
-                    app.innerHTML = `
+                    updateView(`
                         <div class="min-h-screen bg-slate-50 flex flex-col">
                             <div class="flex-1 p-6 flex flex-col justify-center max-w-md mx-auto w-full">
                                 <div class="bg-white rounded-3xl shadow-xl shadow-slate-200 overflow-hidden">
@@ -3067,12 +3286,12 @@
                                 </div>
                             </div>
                         </div>
-                    `;
+                    `);
                     return;
                 }
                 
                 if (this.showingProductDB) {
-                    app.innerHTML = `
+                    updateView(`
                         <div class="min-h-screen bg-slate-50 pb-24">
                             <div class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-20">
                                 <div class="flex items-center justify-between p-4">
@@ -3144,7 +3363,7 @@
                                 ` : ''}
                             </div>
                         </div>
-                    `;
+                    `);
                     return;
                 }
                 
@@ -3155,7 +3374,7 @@
                         totalBatches += Object.keys(rm.batches || {}).length;
                     });
                     
-                    app.innerHTML = `
+                    updateView(`
                         <div class="min-h-screen bg-slate-50 pb-24">
                             <div class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-20">
                                 <div class="flex items-center justify-between p-4">
@@ -3236,7 +3455,7 @@
                                 ` : ''}
                             </div>
                         </div>
-                    `;
+                    `);
                     return;
                 }
 
@@ -3249,7 +3468,7 @@
                         groupedSessions[date].push(session);
                     });
                     
-                    app.innerHTML = `
+                    updateView(`
                         <div class="min-h-screen bg-slate-50 p-4">
                             <div class="max-w-2xl mx-auto">
                                 <!-- Header -->
@@ -3386,12 +3605,12 @@
                                 </button>
                             </div>
                         </div>
-                    `;
+                    `);
                     return;
                 }
 
                 if (this.showingSettings) {
-                    app.innerHTML = `
+                    updateView(`
                         <div class="min-h-screen bg-slate-50 p-4 flex items-center justify-center">
                             <div class="max-w-md w-full bg-white rounded-3xl shadow-xl shadow-slate-200 overflow-hidden">
                                 <div class="p-6 border-b border-slate-100 flex items-center justify-between">
@@ -3562,13 +3781,13 @@
                                 </div>
                             </div>
                         </div>
-                    `;
+                    `);
                     return;
                 }
                 
                 // Main screen
                 const userName = getUserName();
-                app.innerHTML = `
+                updateView(`
                     <div class="min-h-screen bg-slate-50 pb-32">
                         <!-- Sticky Header -->
                         <div class="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3 shadow-sm">
@@ -3824,7 +4043,7 @@
                             </button>
                         </div>
                     </div>
-                `;
+                `);
             }
         }
 
