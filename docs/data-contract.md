@@ -27,7 +27,7 @@ Captures every counted pallet/item.
 | `description` | text | Human readable description. |
 | `unit_type` | text | Defaults to `cases`; RM scans may set `kg`. |
 | `cases_on_pallet` | integer | Encoded count from QR (FP). |
-| `actual_cases` | integer/decimal | Operator-entered quantity. |
+| `actual_cases` | numeric(18,4) | Operator-entered quantity (cases or kg). |
 | `expiry_date` | date | Required for RM entries by trigger. |
 | `location` | text | Free-form notes (legacy). |
 | `site` / `aisle` / `rack` | text | Structured location hierarchy. |

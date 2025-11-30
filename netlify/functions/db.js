@@ -39,7 +39,7 @@ exports.handler = async (event) => {
             batch_number VARCHAR(5),
             pallet_number VARCHAR(2),
             cases_on_pallet INT,
-            actual_cases INT,
+            actual_cases NUMERIC(18,4),
             stock_code VARCHAR(50),
             description TEXT,
             raw_code VARCHAR(20),
