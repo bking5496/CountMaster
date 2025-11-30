@@ -941,7 +941,7 @@
             }
 
             get useNeonDB() {
-                return db.connected;
+                return db.mode === 'netlify';
             }
             
             toggleLocationScanning() {

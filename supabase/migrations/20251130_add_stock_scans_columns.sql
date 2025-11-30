@@ -156,6 +156,30 @@ CREATE TABLE IF NOT EXISTS public.session_devices (
     UNIQUE(session_id, device_id)
 );
 
+DO $$
+BEGIN
+    WITH ranked AS (
+        SELECT id,
+               ROW_NUMBER() OVER (PARTITION BY session_id, device_id ORDER BY COALESCE(last_seen, joined_at) DESC, id DESC) AS rn
+        FROM public.session_devices
+    )
+    DELETE FROM public.session_devices
+    WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
+END $$;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conrelid = 'public.session_devices'::regclass
+          AND conname = 'session_devices_session_device_key'
+    ) THEN
+        ALTER TABLE public.session_devices
+            ADD CONSTRAINT session_devices_session_device_key UNIQUE (session_id, device_id);
+    END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS public.session_status_events (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id text REFERENCES public.stock_takes(id) ON DELETE CASCADE,
