@@ -668,6 +668,70 @@
             return sessions.find(s => s.id === sessionId);
         };
 
+        // Supabase session helpers
+        const supabaseSessionsEnabled = Boolean(supabase);
+
+        const mapSupabaseSession = (row) => ({
+            id: row.id,
+            sessionNumber: row.session_number,
+            sessionType: row.session_type,
+            date: row.take_date,
+            startedBy: row.started_by,
+            startedAt: row.started_at,
+            completedAt: row.completed_at,
+            status: row.status || 'active',
+            devices: (row.metadata && row.metadata.devices) || [],
+            metadata: row.metadata || {}
+        });
+
+        const buildSupabaseSessionPayload = (session) => ({
+            id: session.id,
+            session_type: session.sessionType,
+            session_number: session.sessionNumber,
+            take_date: session.date,
+            status: session.status || 'active',
+            started_by: session.startedBy,
+            started_at: session.startedAt,
+            completed_at: session.completedAt || null,
+            metadata: {
+                ...(session.metadata || {}),
+                devices: session.devices || [],
+                lastUpdatedBy: session.lastUpdatedBy || (session.devices?.find(d => d.deviceId === DEVICE_ID)?.userName || null),
+                lastUpdatedAt: new Date().toISOString()
+            }
+        });
+
+        async function syncSessionsFromSupabase(date) {
+            if (!supabaseSessionsEnabled || !date) return;
+            try {
+                const { data, error } = await supabase
+                    .from('stock_takes')
+                    .select('*')
+                    .eq('take_date', date)
+                    .order('session_number', { ascending: true });
+                if (error) throw error;
+                const mapped = (data || []).map(mapSupabaseSession);
+                saveSessionsForDate(date, mapped);
+                return mapped;
+            } catch (err) {
+                console.error('Failed to sync sessions from Supabase:', err);
+                return null;
+            }
+        }
+
+        async function saveSessionToSupabase(session) {
+            if (!supabaseSessionsEnabled || !session) return;
+            try {
+                const payload = buildSupabaseSessionPayload(session);
+                const { error } = await supabase
+                    .from('stock_takes')
+                    .upsert(payload, { onConflict: 'id' });
+                if (error) throw error;
+            } catch (err) {
+                console.error('Failed to save session to Supabase:', err);
+            }
+        }
+
         class ScannerApp {
             constructor() {
                 this.scans = [];
