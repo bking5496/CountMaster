@@ -694,7 +694,7 @@
             return null;
         };
         
-        // Mark a device as completed in a session
+        // Mark a device as completed in a session (session stays open until ended manually)
         const markDeviceCompleted = async (date, sessionId, deviceId) => {
             const sessions = getSessionsForDate(date);
             const idx = sessions.findIndex(s => s.id === sessionId);
@@ -707,12 +707,6 @@
                         device.completedAt = new Date().toISOString();
                         device.lastSeen = new Date().toISOString();
                     }
-                }
-                // Check if all devices are completed
-                const allCompleted = sessions[idx].devices?.every(d => d.status === 'completed');
-                if (allCompleted) {
-                    sessions[idx].status = 'completed';
-                    sessions[idx].completedAt = new Date().toISOString();
                 }
                 saveSessionsForDate(date, sessions);
                 await saveSessionToSupabase(sessions[idx]);
@@ -1197,91 +1191,77 @@
             async endStockTake() {
                 const sessionId = this.activeStockTake?.id;
                 const sessionDate = this.activeStockTake?.date || this.currentTakeDate;
-                
-                if (this.scans.length === 0) {
-                    if (!confirm('No items scanned. End this stock take?')) return;
-                    
-                    // Mark device as completed in session
-                    if (sessionId) {
-                        const updatedSession = await markDeviceCompleted(sessionDate, sessionId, DEVICE_ID);
-                        if (updatedSession && updatedSession.status === 'completed') {
-                            alert('Session complete! All devices have finished.');
-                        }
-                        const hbStatus = updatedSession?.status === 'completed' ? 'completed' : 'inactive';
-                        this.stopHeartbeat(hbStatus);
-                    } else if (supabaseSessionsEnabled) {
+
+                if (!sessionId) {
+                    alert('No active stock take to complete.');
+                    return;
+                }
+
+                const finalizeDeviceWrapUp = async () => {
+                    const updatedSession = await markDeviceCompleted(sessionDate, sessionId, DEVICE_ID);
+                    if (supabaseSessionsEnabled) {
                         this.stopHeartbeat('inactive');
+                    }
+                    if (updatedSession) {
+                        const remaining = updatedSession.devices?.filter(d => d.status === 'active').length || 0;
+                        if (remaining > 0) {
+                            alert(`You are marked as completed.\n\n${remaining} device(s) are still counting. When everyone finishes, end the stock take from Session History.`);
+                        } else {
+                            alert('All devices are now marked complete. End the entire stock take from Session History when you are ready to finalize.');
+                        }
+                    } else {
+                        alert('You are marked as completed. End the stock take from Session History when ready.');
                     }
                     this.stopAutoSync();
                     clearActiveStockTake();
                     this.activeStockTake = null;
+                    this.scans = [];
                     this.selectedStockTakeType = null;
                     this.showingStartStockTake = true;
                     this.render();
+                };
+
+                if (this.scans.length === 0) {
+                    const confirmDone = confirm('No items were scanned on this device. Mark yourself as completed? This will NOT end the overall stock take.');
+                    if (!confirmDone) return;
+                    await finalizeDeviceWrapUp();
                     return;
                 }
-                
-                // Reload to get all scans from all devices
+
                 await this.loadScans();
-                
-                // Get current session info for device status
-                const currentSession = sessionId ? getSessionById(sessionDate, sessionId) : null;
-                const activeDevices = currentSession?.devices?.filter(d => d.status === 'active') || [];
+
+                const currentSession = getSessionById(sessionDate, sessionId);
+                const deviceScanCount = this.scans.filter(s => s.deviceId === DEVICE_ID).length;
+                const otherActiveDevices = currentSession?.devices?.filter(d => d.status === 'active' && d.deviceId !== DEVICE_ID) || [];
                 const completedDevices = currentSession?.devices?.filter(d => d.status === 'completed') || [];
-                const totalDevices = currentSession?.devices?.length || 1;
-                const otherActiveDevices = activeDevices.filter(d => d.deviceId !== DEVICE_ID);
-                
-                let confirmMessage = `End Your Stock Take\n\n` +
-                    `Your scans: ${this.scans.filter(s => s.deviceId === DEVICE_ID).length}\n` +
+
+                let summary = `Mark Your Count Complete\n\n` +
+                    `Your scans: ${deviceScanCount}\n` +
                     `Total session scans: ${this.scans.length}\n\n`;
-                
+
                 if (otherActiveDevices.length > 0) {
-                    confirmMessage += `⚠️ ${otherActiveDevices.length} other device(s) still active:\n`;
+                    summary += `⚠️ ${otherActiveDevices.length} other device(s) are still active:\n`;
                     otherActiveDevices.forEach(d => {
-                        confirmMessage += `  • ${d.userName}\n`;
+                        summary += `  • ${d.userName}\n`;
                     });
-                    confirmMessage += `\nSession will remain open until all devices finish.\n\n`;
+                    summary += `\nThis only marks your device as completed.\nThe stock take stays open until it is ended from Session History.\n\n`;
                 } else if (completedDevices.length > 0) {
-                    confirmMessage += `✓ ${completedDevices.length} device(s) already completed\n`;
-                    confirmMessage += `You are the last active device.\n\n`;
+                    summary += `✓ ${completedDevices.length} device(s) already marked done.\n`;
+                    summary += `Use Session History to end the stock take for everyone.\n\n`;
+                } else {
+                    summary += `This will mark only your device as completed.\nEnd the full stock take from Session History when ready.\n\n`;
                 }
-                
-                confirmMessage += `Do you want to export the data before ending?`;
-                
-                const exportFirst = confirm(confirmMessage);
-                
-                if (exportFirst) {
+
+                summary += `Proceed with marking yourself done?`;
+                const proceed = confirm(summary);
+                if (!proceed) return;
+
+                const exportData = confirm('Export your scans before marking done? Click OK to export, or Cancel to skip.');
+                if (exportData) {
                     this.exportStockCount();
                 }
-                
-                // Mark this device as completed
-                if (sessionId) {
-                    const updatedSession = await markDeviceCompleted(sessionDate, sessionId, DEVICE_ID);
-                    if (updatedSession && updatedSession.status === 'completed') {
-                        alert('🎉 Session Complete!\n\nAll devices have finished their stock take.');
-                        await changeSessionStatusSupabase(updatedSession, 'completed', 'All devices completed');
-                    } else if (updatedSession) {
-                        const remaining = updatedSession.devices?.filter(d => d.status === 'active').length || 0;
-                        if (remaining > 0) {
-                            alert(`Your stock take is complete.\n\n${remaining} device(s) still counting.`);
-                        }
-                    }
-                    if (supabaseSessionsEnabled) {
-                        const hbStatus = updatedSession?.status === 'completed' ? 'completed' : 'inactive';
-                        this.stopHeartbeat(hbStatus);
-                    }
-                }
-                if (!sessionId && supabaseSessionsEnabled) {
-                    this.stopHeartbeat('inactive');
-                }
-                
-                this.stopAutoSync();
-                clearActiveStockTake();
-                this.activeStockTake = null;
-                this.scans = [];
-                this.selectedStockTakeType = null;
-                this.showingStartStockTake = true;
-                this.render();
+
+                await finalizeDeviceWrapUp();
             }
 
             async ensureStockTake() {
@@ -3560,7 +3540,7 @@
                                             </button>
                                         ` : ''}
                                         <button onclick="app.endStockTake()" class="bg-slate-50 text-slate-600 hover:bg-slate-100 px-4 py-2 rounded-xl text-sm font-bold transition-colors">
-                                            End
+                                            I'm Done
                                         </button>
                                     </div>
                                 </div>
