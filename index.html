@@ -240,20 +240,79 @@
                 .forEach(key => localStorage.removeItem(key));
         };
 
-        // Product Database
+        // Product Database - loaded from Supabase or localStorage cache
         let productDatabase = JSON.parse(localStorage.getItem('productDatabase') || '{}');
-        
-        if (Object.keys(productDatabase).length === 0) {
-            productDatabase = {
-                '12345': { stockCode: 'PROD-001', description: 'Widget Assembly' },
-                '12346': { stockCode: 'PROD-002', description: 'Gadget Component' },
-                '12347': { stockCode: 'PROD-003', description: 'Device Module' },
-            };
-            localStorage.setItem('productDatabase', JSON.stringify(productDatabase));
+        let productsLoadedFromDB = false;
+
+        // Load products from Supabase
+        async function loadProductsFromSupabase() {
+            if (!supabase) {
+                console.log('Supabase not available, using cached products');
+                return false;
+            }
+            try {
+                console.log('Loading products from Supabase...');
+                const { data, error } = await supabase
+                    .from('products')
+                    .select('*');
+                
+                if (error) {
+                    console.error('Error loading products:', error);
+                    return false;
+                }
+                
+                if (data && data.length > 0) {
+                    // Convert array to object keyed by batch_number
+                    productDatabase = {};
+                    data.forEach(product => {
+                        const batchNum = product.batch_number || product.BatchNumber || product.batchnumber;
+                        const stockCode = product.stock_code || product.StockCode || product.stockcode;
+                        const description = product.description || product.Description;
+                        if (batchNum) {
+                            productDatabase[batchNum] = { 
+                                stockCode: stockCode || '', 
+                                description: description || '' 
+                            };
+                        }
+                    });
+                    // Cache in localStorage for offline use
+                    localStorage.setItem('productDatabase', JSON.stringify(productDatabase));
+                    productsLoadedFromDB = true;
+                    console.log(`Loaded ${Object.keys(productDatabase).length} products from Supabase`);
+                    return true;
+                }
+                return false;
+            } catch (err) {
+                console.error('Failed to load products from Supabase:', err);
+                return false;
+            }
         }
 
         function saveProductDatabase() {
             localStorage.setItem('productDatabase', JSON.stringify(productDatabase));
+            // Also save to Supabase if available
+            if (supabase && productsLoadedFromDB) {
+                // For manual product additions, we could sync to Supabase here
+                console.log('Product database saved locally');
+            }
+        }
+        
+        // Add a new product to Supabase
+        async function addProductToSupabase(batchNumber, stockCode, description) {
+            if (!supabase) return false;
+            try {
+                const { error } = await supabase
+                    .from('products')
+                    .upsert({ 
+                        batch_number: batchNumber, 
+                        stock_code: stockCode, 
+                        description: description 
+                    }, { onConflict: 'batch_number' });
+                return !error;
+            } catch (err) {
+                console.error('Failed to add product to Supabase:', err);
+                return false;
+            }
         }
 
         // Generate device ID
@@ -304,6 +363,11 @@
             async init() {
                 // Try to initialize database
                 await db.init();
+                
+                // Load products from Supabase (for GitHub Pages deployment)
+                if (isGitHubPages || !isNetlify) {
+                    await loadProductsFromSupabase();
+                }
                 
                 // Check if there's an active stock take for today
                 if (this.activeStockTake && this.activeStockTake.date === this.currentTakeDate) {
@@ -736,7 +800,7 @@
                 this.render();
             }
 
-            addProduct() {
+            async addProduct() {
                 const batch = prompt('Enter Batch Number (5 digits):');
                 if (!batch || !/^\d{5}$/.test(batch)) {
                     alert('Invalid batch number');
@@ -751,7 +815,38 @@
                 
                 productDatabase[batch] = { stockCode, description };
                 saveProductDatabase();
+                
+                // Also save to Supabase if available
+                await addProductToSupabase(batch, stockCode, description);
+                
                 alert('Product added!');
+                this.render();
+            }
+
+            async refreshProductsFromCloud() {
+                if (!supabase) {
+                    alert('Cloud sync not available');
+                    return;
+                }
+                
+                const btn = event.target;
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<span class="animate-spin">↻</span> Loading...';
+                btn.disabled = true;
+                
+                try {
+                    const loaded = await loadProductsFromSupabase();
+                    if (loaded) {
+                        alert(`Loaded ${Object.keys(productDatabase).length} products from Supabase`);
+                    } else {
+                        alert('No products found in Supabase or error occurred');
+                    }
+                } catch (err) {
+                    alert('Error loading products: ' + err.message);
+                } finally {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
                 this.render();
             }
 
@@ -1022,7 +1117,7 @@
                                 <div class="flex items-center justify-between p-4">
                                     <div>
                                         <h1 class="text-xl font-bold text-slate-900">Product Database</h1>
-                                        <p class="text-sm text-slate-500">${Object.keys(productDatabase).length} products registered</p>
+                                        <p class="text-sm text-slate-500">${Object.keys(productDatabase).length} products ${productsLoadedFromDB ? '(from Supabase)' : '(cached)'}</p>
                                     </div>
                                     <button onclick="app.hideProductDatabase()" class="p-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors">
                                         <svg class="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1032,17 +1127,23 @@
                                 </div>
                                 
                                 <div class="flex gap-2 p-4 pt-0">
+                                    <button onclick="app.refreshProductsFromCloud()" class="flex-1 bg-blue-50 text-blue-600 hover:bg-blue-100 py-2.5 px-4 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                        </svg>
+                                        Refresh
+                                    </button>
                                     <button onclick="app.uploadExcel()" class="flex-1 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 py-2.5 px-4 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                                         </svg>
-                                        Import Excel
+                                        Import
                                     </button>
                                     <button onclick="app.exportProductDatabase()" class="flex-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 py-2.5 px-4 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                                         </svg>
-                                        Export Excel
+                                        Export
                                     </button>
                                 </div>
                             </div>
