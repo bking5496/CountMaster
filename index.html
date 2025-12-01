@@ -2506,7 +2506,6 @@
                 // Update local state
                 scan.actualCases = newCases;
                 scan.batchNumber = newBatch;
-                this.saveScans();
                 
                 // Update Supabase if connected
                 if (supabase && this.activeStockTake?.id) {
@@ -2532,6 +2531,9 @@
                         console.error('Failed to update scan in Supabase:', err);
                         alert('Scan updated locally but failed to sync to Supabase.');
                     }
+                } else {
+                    // Offline mode - update localStorage
+                    localStorage_db.set(id, scan);
                 }
                 
                 this.render();
