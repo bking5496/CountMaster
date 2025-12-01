@@ -2460,6 +2460,83 @@
                 this.render();
             }
 
+            editScan(id) {
+                const scan = this.scans.find(s => s.id === id);
+                if (!scan) return;
+
+                this.showModal({
+                    title: 'Edit Scan',
+                    message: `Editing ${scan.stockCode}`,
+                    type: 'form',
+                    fields: [
+                        { 
+                            name: 'actualCases', 
+                            label: 'Quantity', 
+                            type: 'number', 
+                            value: scan.actualCases, 
+                            required: true 
+                        },
+                        { 
+                            name: 'batchNumber', 
+                            label: 'Batch Number', 
+                            type: 'text', 
+                            value: scan.batchNumber || '', 
+                            required: true 
+                        }
+                    ],
+                    confirmText: 'Save Changes',
+                    onConfirm: (data) => this.saveEditedScan(id, data)
+                });
+            }
+
+            async saveEditedScan(id, data) {
+                const scanIndex = this.scans.findIndex(s => s.id === id);
+                if (scanIndex === -1) return;
+                
+                const scan = this.scans[scanIndex];
+                const oldCases = scan.actualCases;
+                const newCases = parseFloat(data.actualCases);
+                const newBatch = data.batchNumber;
+                
+                if (isNaN(newCases)) {
+                    alert('Invalid quantity');
+                    return;
+                }
+
+                // Update local state
+                scan.actualCases = newCases;
+                scan.batchNumber = newBatch;
+                this.saveScans();
+                
+                // Update Supabase if connected
+                if (supabase && this.activeStockTake?.id) {
+                    try {
+                        const { error } = await supabase
+                            .from('stock_scans')
+                            .update({
+                                actual_cases: newCases,
+                                batch_number: newBatch
+                            })
+                            .eq('id', id);
+                            
+                        if (error) throw error;
+                        
+                        await logClientEvent('scan-edit', 'info', this.activeStockTake.id, { 
+                            scanId: id, 
+                            oldCases, 
+                            newCases,
+                            newBatch
+                        });
+                        
+                    } catch (err) {
+                        console.error('Failed to update scan in Supabase:', err);
+                        alert('Scan updated locally but failed to sync to Supabase.');
+                    }
+                }
+                
+                this.render();
+            }
+
             async deleteScan(id) {
                 // Find the scan to show in confirmation
                 const scan = this.scans.find(s => s.id === id);
@@ -5409,7 +5486,7 @@
                                 }
                                 const borderColor = isExpired ? 'bg-red-500' : (scan.actualCases !== scan.casesOnPallet ? 'bg-yellow-500' : 'bg-emerald-500');
                                 return `
-                                <div class="bg-white rounded-2xl p-4 shadow-sm border ${isExpired ? 'border-red-200 bg-red-50' : 'border-slate-100'} relative overflow-hidden group hover-lift transition-all">
+                                <div onclick="app.editScan('${scan.id}')" class="cursor-pointer bg-white rounded-2xl p-4 shadow-sm border ${isExpired ? 'border-red-200 bg-red-50' : 'border-slate-100'} relative overflow-hidden group hover-lift transition-all">
                                     <div class="absolute top-0 left-0 w-1 h-full ${borderColor}"></div>
                                     <div class="pl-3 flex items-start justify-between">
                                         <div class="flex-1 min-w-0">
@@ -5428,7 +5505,7 @@
                                             ${scan.description.includes('Unknown') ? `
                                                 <div class="mb-3">
                                                     <span class="text-orange-600 font-medium text-sm">${scan.description}</span>
-                                                    <button onclick="app.addScannedItemToDatabase(app.scans.find(s => s.id === '${scan.id}'))" class="ml-2 px-2 py-0.5 text-xs font-bold bg-orange-100 text-orange-600 hover:bg-orange-200 rounded-full transition-colors">
+                                                    <button onclick="event.stopPropagation(); app.addScannedItemToDatabase(app.scans.find(s => s.id === '${scan.id}'))" class="ml-2 px-2 py-0.5 text-xs font-bold bg-orange-100 text-orange-600 hover:bg-orange-200 rounded-full transition-colors">
                                                         + Add to DB
                                                     </button>
                                                 </div>
@@ -5484,7 +5561,7 @@
                                                 <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">${scan.unitType === 'kg' ? 'KG' : (scan.unitType === 'units' ? 'UN' : 'Cases')}</div>
                                             </div>
                                             
-                                            <button onclick="app.deleteScan('${scan.id}')" class="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                                            <button onclick="event.stopPropagation(); app.deleteScan('${scan.id}')" class="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                                 </svg>
