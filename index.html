@@ -3464,18 +3464,24 @@
                     if ('BarcodeDetector' in window) {
                         const detector = new BarcodeDetector({ formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code'] });
                         
+                        // Add delay before starting detection to prevent instant re-scan of the same barcode
+                        let scanningEnabled = false;
+                        setTimeout(() => { scanningEnabled = true; }, 2000);
+
                         const scanFrame = async () => {
                             if (!this._unknownStockScannerStream) return;
                             
-                            try {
-                                const barcodes = await detector.detect(video);
-                                if (barcodes.length > 0) {
-                                    const stockCode = barcodes[0].rawValue;
-                                    this.finishUnknownStockScan(stockCode);
-                                    return;
+                            if (scanningEnabled) {
+                                try {
+                                    const barcodes = await detector.detect(video);
+                                    if (barcodes.length > 0) {
+                                        const stockCode = barcodes[0].rawValue;
+                                        this.finishUnknownStockScan(stockCode);
+                                        return;
+                                    }
+                                } catch (err) {
+                                    // Ignore detection errors
                                 }
-                            } catch (err) {
-                                // Ignore detection errors
                             }
                             
                             if (this._unknownStockScannerStream) {
@@ -4121,6 +4127,24 @@
                 }
             }
 
+            selectModalChoice(fieldName, value) {
+                // Update hidden input
+                const input = document.getElementById(`modal-field-${fieldName}`);
+                if (input) input.value = value;
+                
+                // Update UI
+                const buttons = document.querySelectorAll(`.modal-choice-btn-${fieldName}`);
+                buttons.forEach(btn => {
+                    if (btn.id === `modal-choice-${fieldName}-${value}`) {
+                        btn.classList.remove('border-slate-200', 'text-slate-600');
+                        btn.classList.add('border-blue-600', 'bg-blue-50', 'text-blue-700');
+                    } else {
+                        btn.classList.add('border-slate-200', 'text-slate-600');
+                        btn.classList.remove('border-blue-600', 'bg-blue-50', 'text-blue-700');
+                    }
+                });
+            }
+
             renderModal() {
                 const root = document.getElementById('modal-root');
                 if (!this.modalState) {
@@ -4140,7 +4164,22 @@
                     content = fields.map(field => `
                         <div class="mb-4">
                             <label class="block text-sm font-bold text-slate-700 mb-2">${field.label}</label>
-                            ${field.type === 'checkbox' ? `
+                            ${field.type === 'choice' ? `
+                                <div class="grid grid-cols-2 gap-3">
+                                    ${field.options.map(opt => `
+                                        <button 
+                                            type="button"
+                                            onclick="app.selectModalChoice('${field.name}', '${opt.value}')"
+                                            id="modal-choice-${field.name}-${opt.value}"
+                                            class="modal-choice-btn-${field.name} p-4 rounded-xl border-2 text-center transition-all ${field.value === opt.value ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 hover:border-slate-300 text-slate-600'}"
+                                        >
+                                            <div class="font-bold text-sm">${opt.label}</div>
+                                            ${opt.sublabel ? `<div class="text-xs opacity-75 mt-1">${opt.sublabel}</div>` : ''}
+                                        </button>
+                                    `).join('')}
+                                    <input type="hidden" id="modal-field-${field.name}" value="${field.value || ''}">
+                                </div>
+                            ` : field.type === 'checkbox' ? `
                                 <label class="flex items-center gap-3 p-3 border border-slate-200 rounded-xl bg-slate-50">
                                     <input type="checkbox" id="modal-field-${field.name}" ${field.value ? 'checked' : ''} class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500">
                                     <span class="text-slate-700 font-medium">${field.placeholder || ''}</span>
