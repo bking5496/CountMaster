@@ -1121,6 +1121,7 @@
                 this._renderScheduled = false;
                 this._lastRenderTime = 0;
                 this._renderDebounceMs = 16; // ~60fps max
+                this._pendingRender = false; // True when render was skipped during input and needs to happen later
                 
                 this.init();
             }
@@ -1633,24 +1634,30 @@
                 }
                 const runSync = async () => {
                     if (!this.isBrowserOnline) return;
-                    // Don't reload/re-render during case entry or modal input to avoid losing input
-                    if (this.showingCaseEntry) return;
-                    if (this.modalState) return; // Skip sync while modal is open
                     
                     try {
+                        // Always sync data from database - this keeps data in sync
                         if (this.useNeonDB) {
                             await this.loadScans();
                         } else if (supabaseSessionsEnabled && this.activeStockTake?.id) {
                             await this.refreshSessionsFromSupabase();
                             await this.loadScans();
                         }
-                        this.render();
+                        
+                        // Only render if not in an input state - prevents clearing user input
+                        // Data is still synced, just UI update is deferred
+                        if (!this.showingCaseEntry && !this.modalState) {
+                            this.render();
+                        } else {
+                            // Mark that we need to render when input is done
+                            this._pendingRender = true;
+                        }
                     } catch (err) {
                         console.warn('Auto-sync failed', err);
                     }
                 };
                 runSync();
-                // Sync every 10 seconds instead of 5 to reduce load
+                // Sync every 10 seconds
                 this.syncInterval = setInterval(runSync, 10000);
             }
 
@@ -2275,6 +2282,8 @@
                 
                 this.currentScan = null;
                 this.showingCaseEntry = false;
+                // Clear pending render flag since we're rendering now
+                this._pendingRender = false;
                 this.triggerHaptic('success');
                 this.render();
             }
@@ -2405,6 +2414,10 @@
                 
                 this.currentScan = null;
                 this.showingCaseEntry = false;
+                // Check if a render was deferred during sync while case entry was open
+                if (this._pendingRender) {
+                    this._pendingRender = false;
+                }
                 this.render();
             }
 
@@ -3222,6 +3235,10 @@
 
             closeModal() {
                 this.modalState = null;
+                // Check if a render was deferred during sync while modal was open
+                if (this._pendingRender) {
+                    this._pendingRender = false;
+                }
                 this.render();
             }
 
@@ -3252,6 +3269,8 @@
                 
                 // Only render if no new modal was opened
                 if (!this.modalState) {
+                    // Clear pending render flag since we're rendering now
+                    this._pendingRender = false;
                     this.render();
                 }
             }
