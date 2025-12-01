@@ -26,7 +26,7 @@
         }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900 min-h-screen font-sans antialiased selection:bg-indigo-100 selection:text-indigo-700">
+<body class="bg-slate-50 text-slate-900 min-h-screen font-sans antialiased selection:bg-blue-100 selection:text-blue-700">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <div id="app" class="max-w-md mx-auto min-h-screen bg-white shadow-2xl shadow-slate-200 overflow-hidden relative"></div>
     <div id="modal-root" class="relative z-50"></div>
@@ -2770,7 +2770,7 @@
                 
                 if (type === 'input') {
                     content = `
-                        <input type="text" id="modal-input" class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50/50 outline-none transition-all" placeholder="Enter value" autocomplete="off">
+                        <input type="text" id="modal-input" class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 outline-none transition-all" placeholder="Enter value" autocomplete="off">
                     `;
                 } else if (type === 'form') {
                     content = fields.map(field => `
@@ -2778,7 +2778,7 @@
                             <label class="block text-sm font-bold text-slate-700 mb-2">${field.label}</label>
                             ${field.type === 'checkbox' ? `
                                 <label class="flex items-center gap-3 p-3 border border-slate-200 rounded-xl bg-slate-50">
-                                    <input type="checkbox" id="modal-field-${field.name}" ${field.value ? 'checked' : ''} class="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500">
+                                    <input type="checkbox" id="modal-field-${field.name}" ${field.value ? 'checked' : ''} class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500">
                                     <span class="text-slate-700 font-medium">${field.placeholder || ''}</span>
                                 </label>
                             ` : `
@@ -2786,7 +2786,7 @@
                                     type="${field.type || 'text'}" 
                                     id="modal-field-${field.name}" 
                                     value="${field.value || ''}" 
-                                    class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50/50 outline-none transition-all" 
+                                    class="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-50/50 outline-none transition-all" 
                                     placeholder="${field.placeholder || ''}"
                                     ${field.required ? 'required' : ''}
                                 >
@@ -2796,7 +2796,7 @@
                 } else if (type === 'loading') {
                     content = `
                         <div class="flex flex-col items-center justify-center py-4">
-                            <div class="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                            <div class="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
                             <p class="text-slate-600 font-medium">${message || 'Loading...'}</p>
                         </div>
                     `;
@@ -2821,7 +2821,7 @@
                                                 ${cancelText}
                                             </button>
                                         ` : ''}
-                                        <button type="submit" class="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 transition-all">
+                                        <button type="submit" class="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition-all">
                                             ${confirmText}
                                         </button>
                                     </div>
@@ -2967,8 +2967,8 @@
                                         <span>Connected to Neon DB</span>
                                     </div>
                                 ` : `
-                                    <div class="inline-flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-700 rounded-full text-xs font-bold border border-orange-100">
-                                        <div class="w-2 h-2 bg-orange-500 rounded-full"></div>
+                                    <div class="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-xs font-bold border border-slate-200">
+                                        <div class="w-2 h-2 bg-slate-400 rounded-full"></div>
                                         <span>Offline Mode</span>
                                     </div>
                                 `}
@@ -3000,7 +3000,7 @@
                             
                             <div class="flex-1 flex flex-col p-6">
                                 <div class="flex items-center gap-4 mb-6">
-                                    <div class="w-16 h-16 ${isRM ? 'bg-gradient-to-br from-amber-500 to-orange-500' : 'bg-gradient-to-br from-indigo-600 to-violet-600'} rounded-2xl flex items-center justify-center shadow-lg ${isRM ? 'shadow-amber-200' : 'shadow-indigo-200'}">
+                                    <div class="w-16 h-16 ${isRM ? 'bg-gradient-to-br from-teal-500 to-teal-600' : 'bg-gradient-to-br from-blue-600 to-blue-700'} rounded-2xl flex items-center justify-center shadow-lg ${isRM ? 'shadow-teal-200' : 'shadow-blue-200'}">
                                         ${isRM ? `
                                             <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
@@ -3030,16 +3030,16 @@
                                                 return `
                                                     <button 
                                                         onclick="app.joinExistingSession('${session.id}', '${savedName}')"
-                                                        class="w-full p-4 border-2 ${isRM ? 'border-amber-200 hover:border-amber-400 hover:bg-amber-50' : 'border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50'} rounded-2xl transition-all text-left"
+                                                        class="w-full p-4 border-2 ${isRM ? 'border-teal-200 hover:border-teal-400 hover:bg-teal-50' : 'border-blue-200 hover:border-blue-400 hover:bg-blue-50'} rounded-2xl transition-all text-left"
                                                     >
                                                         <div class="flex items-center justify-between mb-2">
                                                             <div class="flex items-center gap-2">
-                                                                <span class="px-3 py-1 text-sm font-bold ${isRM ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'} rounded-full">
+                                                                <span class="px-3 py-1 text-sm font-bold ${isRM ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'} rounded-full">
                                                                     Session #${session.sessionNumber}
                                                                 </span>
                                                                 <span class="text-slate-600">by ${session.startedBy}</span>
                                                             </div>
-                                                            <svg class="w-5 h-5 ${isRM ? 'text-amber-400' : 'text-indigo-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <svg class="w-5 h-5 ${isRM ? 'text-teal-400' : 'text-blue-400'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                                                             </svg>
                                                         </div>
@@ -3087,7 +3087,7 @@
                                 <!-- Start New Session -->
                                 <button 
                                     onclick="app.startNewStockTake('${savedName}', '${sessionType}')"
-                                    class="w-full ${isRM ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-amber-200' : 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 shadow-indigo-200'} text-white p-5 rounded-2xl text-lg font-bold shadow-lg transition-all flex items-center justify-center gap-3"
+                                    class="w-full ${isRM ? 'bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 shadow-teal-200' : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-blue-200'} text-white p-5 rounded-2xl text-lg font-bold shadow-lg transition-all flex items-center justify-center gap-3"
                                 >
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
@@ -3126,10 +3126,10 @@
                                 <!-- Overlay Guide -->
                                 <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
                                     <div class="w-64 h-64 border-2 border-white/50 rounded-3xl relative">
-                                        <div class="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-indigo-500 rounded-tl-xl -mt-1 -ml-1"></div>
-                                        <div class="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-indigo-500 rounded-tr-xl -mt-1 -mr-1"></div>
-                                        <div class="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-indigo-500 rounded-bl-xl -mb-1 -ml-1"></div>
-                                        <div class="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-indigo-500 rounded-br-xl -mb-1 -mr-1"></div>
+                                        <div class="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-blue-500 rounded-tl-xl -mt-1 -ml-1"></div>
+                                        <div class="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-blue-500 rounded-tr-xl -mt-1 -mr-1"></div>
+                                        <div class="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-blue-500 rounded-bl-xl -mb-1 -ml-1"></div>
+                                        <div class="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-blue-500 rounded-br-xl -mb-1 -mr-1"></div>
                                         
                                         <div class="absolute top-1/2 left-0 right-0 h-0.5 bg-red-500/50 animate-pulse"></div>
                                     </div>
@@ -3156,7 +3156,7 @@
                         <div class="min-h-screen bg-slate-50 flex flex-col">
                             <div class="flex-1 p-6 flex flex-col justify-center max-w-md mx-auto w-full">
                                 <div class="bg-white rounded-3xl shadow-xl shadow-slate-200 overflow-hidden">
-                                    <div class="bg-amber-500 p-6 text-white text-center">
+                                    <div class="bg-blue-500 p-6 text-white text-center">
                                         <div class="flex items-center justify-center gap-2 mb-2">
                                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
@@ -3164,13 +3164,13 @@
                                             <span class="font-bold">CONFIRM EXPIRY DATE</span>
                                         </div>
                                         <h2 class="text-xl font-bold">Multiple Expiry Dates Found</h2>
-                                        <p class="text-amber-100 text-sm mt-1">Please select the correct expiry date for this item</p>
+                                        <p class="text-blue-100 text-sm mt-1">Please select the correct expiry date for this item</p>
                                     </div>
                                     
                                     <div class="p-6 space-y-4">
                                         <!-- Product Info -->
                                         <div class="text-center pb-4 border-b border-slate-100">
-                                            <div class="inline-block bg-amber-50 text-amber-700 px-3 py-1 rounded-full text-sm font-bold mb-2">
+                                            <div class="inline-block bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-bold mb-2">
                                                 ${scan.stockCode}
                                             </div>
                                             <h3 class="text-lg font-medium text-slate-900 leading-tight mb-1">${scan.description}</h3>
@@ -3191,11 +3191,11 @@
                                                 return `
                                                     <button 
                                                         onclick="app.selectExpiryDate('${expDate}')"
-                                                        class="w-full p-4 border-2 ${isExpired ? 'border-red-200 bg-red-50 hover:border-red-400' : 'border-slate-200 bg-white hover:border-amber-400 hover:bg-amber-50'} rounded-xl transition-all text-left flex items-center justify-between"
+                                                        class="w-full p-4 border-2 ${isExpired ? 'border-red-200 bg-red-50 hover:border-red-400' : 'border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50'} rounded-xl transition-all text-left flex items-center justify-between"
                                                     >
                                                         <div class="flex items-center gap-3">
-                                                            <div class="w-10 h-10 ${isExpired ? 'bg-red-100' : 'bg-amber-100'} rounded-full flex items-center justify-center">
-                                                                <svg class="w-5 h-5 ${isExpired ? 'text-red-600' : 'text-amber-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <div class="w-10 h-10 ${isExpired ? 'bg-red-100' : 'bg-blue-100'} rounded-full flex items-center justify-center">
+                                                                <svg class="w-5 h-5 ${isExpired ? 'text-red-600' : 'text-blue-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                                                 </svg>
                                                             </div>
@@ -3244,7 +3244,7 @@
                         <div class="min-h-screen bg-slate-50 flex flex-col">
                             <div class="flex-1 p-6 flex flex-col justify-center max-w-md mx-auto w-full">
                                 <div class="bg-white rounded-3xl shadow-xl shadow-slate-200 overflow-hidden">
-                                    <div class="${isExpired ? 'bg-red-600' : 'bg-indigo-600'} p-6 text-white text-center">
+                                    <div class="${isExpired ? 'bg-red-600' : 'bg-blue-600'} p-6 text-white text-center">
                                         ${isExpired ? `
                                             <div class="flex items-center justify-center gap-2 mb-2">
                                                 <svg class="w-6 h-6 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3254,7 +3254,7 @@
                                             </div>
                                         ` : ''}
                                         <h2 class="text-2xl font-bold">Confirm Count</h2>
-                                        <p class="${isExpired ? 'text-red-100' : 'text-indigo-100'} text-sm mt-1">Verify the physical stock count</p>
+                                        <p class="${isExpired ? 'text-red-100' : 'text-blue-100'} text-sm mt-1">Verify the physical stock count</p>
                                     </div>
                                     
                                     ${isExpired ? `
@@ -3281,13 +3281,13 @@
                                     <div class="p-6 space-y-6">
                                         <!-- Product Info -->
                                         <div class="text-center">
-                                            <div class="inline-block ${isExpired ? 'bg-red-50 text-red-700' : 'bg-indigo-50 text-indigo-700'} px-3 py-1 rounded-full text-sm font-bold mb-2">
+                                            <div class="inline-block ${isExpired ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'} px-3 py-1 rounded-full text-sm font-bold mb-2">
                                                 ${scan.stockCode}
                                             </div>
                                             <h3 class="text-lg font-medium text-slate-900 leading-tight mb-1">${scan.description}</h3>
                                             ${scan.isRawMaterial ? `
                                                 <div class="text-sm text-slate-500">Batch: ${scan.batchNumber}</div>
-                                                <div class="mt-1 inline-block px-2 py-0.5 text-xs font-bold ${scan.unitType === 'kg' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'} rounded-full">
+                                                <div class="mt-1 inline-block px-2 py-0.5 text-xs font-bold ${scan.unitType === 'kg' ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'} rounded-full">
                                                     ${scan.unitType === 'kg' ? '⚖️ Measured in KG' : '📦 Counted in Units'}
                                                 </div>
                                             ` : `
@@ -3305,7 +3305,7 @@
                                             ` : ''}
                                             
                                             <div class="relative">
-                                                <label class="block text-xs font-bold ${isExpired ? 'text-red-600' : 'text-indigo-600'} uppercase tracking-wider mb-2">
+                                                <label class="block text-xs font-bold ${isExpired ? 'text-red-600' : 'text-blue-600'} uppercase tracking-wider mb-2">
                                                     ${scan.isRawMaterial ? (scan.unitType === 'kg' ? 'Quantity (KG)' : 'Quantity (Units)') : 'Actual Count'}
                                                 </label>
                                                 <input
@@ -3330,7 +3330,7 @@
                                             <button onclick="app.cancelCaseEntry()" class="bg-white border-2 border-slate-200 text-slate-600 hover:bg-slate-50 py-4 rounded-xl text-lg font-bold transition-colors">
                                                 Cancel
                                             </button>
-                                            <button onclick="app.submitCaseCount()" class="${isExpired ? 'bg-red-600 hover:bg-red-700 shadow-red-200' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'} text-white py-4 rounded-xl text-lg font-bold shadow-lg transition-all">
+                                            <button onclick="app.submitCaseCount()" class="${isExpired ? 'bg-red-600 hover:bg-red-700 shadow-red-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'} text-white py-4 rounded-xl text-lg font-bold shadow-lg transition-all">
                                                 ${isExpired ? 'Confirm (Expired)' : 'Confirm'}
                                             </button>
                                         </div>
@@ -3365,7 +3365,7 @@
                                         </svg>
                                         Refresh
                                     </button>
-                                    <button onclick="app.uploadExcel()" class="flex-1 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 py-2.5 px-4 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2">
+                                    <button onclick="app.uploadExcel()" class="flex-1 bg-blue-50 text-blue-600 hover:bg-blue-100 py-2.5 px-4 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                                         </svg>
@@ -3397,7 +3397,7 @@
                                             <span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded font-mono font-bold">
                                                 ${batch}
                                             </span>
-                                            <span class="text-sm font-bold text-indigo-600">${info.stockCode}</span>
+                                            <span class="text-sm font-bold text-blue-600">${info.stockCode}</span>
                                         </div>
                                         <div class="text-slate-900 text-sm">${info.description}</div>
                                     </div>
@@ -3405,7 +3405,7 @@
                             </div>
                             
                             <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 space-y-3 z-20">
-                                <button onclick="app.addProduct()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl text-lg font-bold shadow-lg shadow-indigo-200 transition-all">
+                                <button onclick="app.addProduct()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl text-lg font-bold shadow-lg shadow-blue-200 transition-all">
                                     + Add Product
                                 </button>
                                 ${Object.keys(productDatabase).length > 0 ? `
@@ -3448,7 +3448,7 @@
                                         </svg>
                                         Refresh
                                     </button>
-                                    <button onclick="app.uploadRMExcel()" class="flex-1 bg-amber-50 text-amber-600 hover:bg-amber-100 py-2.5 px-4 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2">
+                                    <button onclick="app.uploadRMExcel()" class="flex-1 bg-teal-50 text-teal-600 hover:bg-teal-100 py-2.5 px-4 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                                         </svg>
@@ -3466,8 +3466,8 @@
                             <div class="p-4 space-y-3">
                                 ${rmCount === 0 ? `
                                     <div class="text-center py-16">
-                                        <div class="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                            <svg class="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <div class="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <svg class="w-8 h-8 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
                                             </svg>
                                         </div>
@@ -3477,7 +3477,7 @@
                                 ` : Object.entries(rawMaterialsDatabase).map(([stockCode, info]) => `
                                     <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
                                         <div class="flex items-center gap-3 mb-2">
-                                            <span class="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded font-mono font-bold">
+                                            <span class="bg-teal-100 text-teal-700 text-xs px-2 py-1 rounded font-mono font-bold">
                                                 ${stockCode}
                                             </span>
                                             <span class="text-xs text-slate-400">${Object.keys(info.batches || {}).length} batches</span>
@@ -3497,7 +3497,7 @@
                             </div>
                             
                             <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 space-y-3 z-20">
-                                <button onclick="app.addRawMaterial()" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-3.5 rounded-xl text-lg font-bold shadow-lg shadow-amber-200 transition-all">
+                                <button onclick="app.addRawMaterial()" class="w-full bg-teal-600 hover:bg-teal-700 text-white py-3.5 rounded-xl text-lg font-bold shadow-lg shadow-teal-200 transition-all">
                                     + Add Raw Material
                                 </button>
                                 ${rmCount > 0 ? `
@@ -3527,7 +3527,7 @@
                                 <div class="bg-white rounded-2xl shadow-lg shadow-slate-200 overflow-hidden mb-4">
                                     <div class="p-4 border-b border-slate-100 flex items-center justify-between">
                                         <div class="flex items-center gap-3">
-                                            <div class="w-10 h-10 bg-violet-500 rounded-xl flex items-center justify-center">
+                                            <div class="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
                                                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                                 </svg>
@@ -3546,11 +3546,11 @@
                                     
                                     ${this.selectedHistorySession ? `
                                         <!-- Selected Session Details -->
-                                        <div class="p-4 bg-violet-50 border-b border-violet-100">
+                                        <div class="p-4 bg-blue-50 border-b border-blue-100">
                                             <div class="flex items-center justify-between mb-3">
                                                 <div>
                                                     <div class="flex items-center gap-2">
-                                                        <span class="${this.selectedHistorySession.sessionType === 'RM' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'} text-xs font-bold px-2 py-0.5 rounded-full">
+                                                        <span class="${this.selectedHistorySession.sessionType === 'RM' ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'} text-xs font-bold px-2 py-0.5 rounded-full">
                                                             ${this.selectedHistorySession.sessionType === 'RM' ? 'Raw Materials' : 'Finished Products'}
                                                         </span>
                                                         <span class="text-xs text-slate-500">${this.selectedHistorySession.date}</span>
@@ -3558,14 +3558,14 @@
                                                     <p class="text-sm text-slate-600 mt-1">Session: ${this.selectedHistorySession.id.slice(-8)}</p>
                                                     <p class="text-xs text-slate-500">Device: ${this.selectedHistorySession.device}</p>
                                                 </div>
-                                                <button onclick="app.exportHistorySession()" class="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-bold hover:bg-violet-700 transition-colors flex items-center gap-2">
+                                                <button onclick="app.exportHistorySession()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors flex items-center gap-2">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                                     </svg>
                                                     Export
                                                 </button>
                                             </div>
-                                            <div class="text-sm text-violet-700 font-medium">${this.historyScans.length} scan(s)</div>
+                                            <div class="text-sm text-blue-700 font-medium">${this.historyScans.length} scan(s)</div>
                                         </div>
                                         
                                         <!-- Scans List -->
@@ -3585,7 +3585,7 @@
                                                             </div>
                                                         </div>
                                                         <div class="text-right">
-                                                            <div class="font-bold text-lg ${this.selectedHistorySession.sessionType === 'RM' ? 'text-amber-600' : 'text-indigo-600'}">
+                                                            <div class="font-bold text-lg ${this.selectedHistorySession.sessionType === 'RM' ? 'text-teal-600' : 'text-blue-600'}">
                                                                 ${scan.cases}
                                                             </div>
                                                             <div class="text-xs text-slate-500">${scan.unitType || 'units'}</div>
@@ -3616,8 +3616,8 @@
                                                         <button onclick="app.loadSessionHistory('${session.id}')" class="w-full p-4 hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0">
                                                             <div class="flex items-center justify-between">
                                                                 <div class="flex items-center gap-3">
-                                                                    <div class="w-10 h-10 ${session.sessionType === 'RM' ? 'bg-amber-100' : 'bg-indigo-100'} rounded-xl flex items-center justify-center">
-                                                                        <span class="${session.sessionType === 'RM' ? 'text-amber-600' : 'text-indigo-600'} font-bold text-xs">${session.sessionType}</span>
+                                                                    <div class="w-10 h-10 ${session.sessionType === 'RM' ? 'bg-teal-100' : 'bg-blue-100'} rounded-xl flex items-center justify-center">
+                                                                        <span class="${session.sessionType === 'RM' ? 'text-teal-600' : 'text-blue-600'} font-bold text-xs">${session.sessionType}</span>
                                                                     </div>
                                                                     <div>
                                                                         <div class="flex items-center gap-2">
@@ -3706,7 +3706,7 @@
                                                 </div>
                                                 <button 
                                                     onclick="app.toggleLocationScanning()"
-                                                    class="relative w-12 h-7 rounded-full transition-colors ${this.sessionSettings.locationScanningEnabled ? 'bg-indigo-600' : 'bg-slate-300'}"
+                                                    class="relative w-12 h-7 rounded-full transition-colors ${this.sessionSettings.locationScanningEnabled ? 'bg-blue-600' : 'bg-slate-300'}"
                                                 >
                                                     <span class="absolute top-1 ${this.sessionSettings.locationScanningEnabled ? 'left-6' : 'left-1'} w-5 h-5 bg-white rounded-full shadow transition-all"></span>
                                                 </button>
@@ -3721,11 +3721,11 @@
                                                             id="locationInput"
                                                             value="${this.sessionSettings.currentLocation || ''}"
                                                             placeholder="e.g., Rack A1, Floor 2"
-                                                            class="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                                                            class="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                                                         />
                                                         <button 
                                                             onclick="app.setLocation(document.getElementById('locationInput').value)"
-                                                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors"
+                                                            class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors"
                                                         >
                                                             Set
                                                         </button>
@@ -3738,7 +3738,7 @@
                                                                 value="${this.sessionSettings.site || ''}"
                                                                 oninput="app.updateLocationHierarchy('site', this.value)"
                                                                 placeholder="Plant"
-                                                                class="w-full mt-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                                                                class="w-full mt-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                                                             />
                                                         </div>
                                                         <div>
@@ -3748,7 +3748,7 @@
                                                                 value="${this.sessionSettings.aisle || ''}"
                                                                 oninput="app.updateLocationHierarchy('aisle', this.value)"
                                                                 placeholder="Aisle"
-                                                                class="w-full mt-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                                                                class="w-full mt-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                                                             />
                                                         </div>
                                                         <div>
@@ -3758,7 +3758,7 @@
                                                                 value="${this.sessionSettings.rack || ''}"
                                                                 oninput="app.updateLocationHierarchy('rack', this.value)"
                                                                 placeholder="Rack"
-                                                                class="w-full mt-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                                                                class="w-full mt-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                                                             />
                                                         </div>
                                                     </div>
@@ -3785,24 +3785,24 @@
                                                     noteClass: ''
                                                 },
                                                 supabase: {
-                                                    border: 'border-indigo-200 bg-indigo-50',
-                                                    dot: 'bg-indigo-500',
+                                                    border: 'border-blue-200 bg-blue-50',
+                                                    dot: 'bg-blue-500',
                                                     title: 'Connected to Supabase',
-                                                    titleClass: 'text-indigo-800',
+                                                    titleClass: 'text-blue-800',
                                                     subtitle: 'All scans sync directly to Supabase Postgres',
-                                                    subtitleClass: 'text-indigo-600',
+                                                    subtitleClass: 'text-blue-600',
                                                     note: 'Session heartbeats, duplicate checks, and exports are using Supabase only.',
-                                                    noteClass: 'text-indigo-500'
+                                                    noteClass: 'text-blue-500'
                                                 },
                                                 offline: {
-                                                    border: 'border-amber-200 bg-amber-50',
-                                                    dot: 'bg-amber-500',
+                                                    border: 'border-slate-200 bg-slate-50',
+                                                    dot: 'bg-slate-400',
                                                     title: 'Offline Mode',
-                                                    titleClass: 'text-amber-800',
+                                                    titleClass: 'text-slate-700',
                                                     subtitle: 'Data stored locally on this device',
-                                                    subtitleClass: 'text-amber-600',
+                                                    subtitleClass: 'text-slate-500',
                                                     note: 'Reconnect to sync with Supabase automatically.',
-                                                    noteClass: 'text-amber-600'
+                                                    noteClass: 'text-slate-500'
                                                 }
                                             };
                                             const cfg = configs[mode];
@@ -3822,7 +3822,7 @@
                                     </div>
                                     
                                     <div class="pt-2 space-y-3">
-                                        <button onclick="app.testConnection()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 transition-all">
+                                        <button onclick="app.testConnection()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl text-sm font-bold shadow-lg shadow-blue-100 transition-all">
                                             🔄 Test Connection
                                         </button>
                                         
@@ -3845,13 +3845,13 @@
                         <div class="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3 shadow-sm">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 ${this.activeStockTake?.sessionType === 'RM' ? 'bg-amber-500' : 'bg-indigo-600'} rounded-xl flex items-center justify-center shadow-md ${this.activeStockTake?.sessionType === 'RM' ? 'shadow-amber-200' : 'shadow-indigo-200'}">
+                                    <div class="w-10 h-10 ${this.activeStockTake?.sessionType === 'RM' ? 'bg-teal-600' : 'bg-blue-600'} rounded-xl flex items-center justify-center shadow-md ${this.activeStockTake?.sessionType === 'RM' ? 'shadow-teal-200' : 'shadow-blue-200'}">
                                         <span class="text-white font-bold text-lg">${userName.charAt(0).toUpperCase()}</span>
                                     </div>
                                     <div>
                                         <div class="flex items-center gap-2">
                                             <h1 class="text-sm font-bold text-slate-900 leading-tight">${this.activeStockTake?.sessionType === 'RM' ? 'Raw Materials' : 'Finished Products'}</h1>
-                                            <span class="${this.activeStockTake?.sessionType === 'RM' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'} text-xs font-bold px-2 py-0.5 rounded-full">
+                                            <span class="${this.activeStockTake?.sessionType === 'RM' ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'} text-xs font-bold px-2 py-0.5 rounded-full">
                                                 #${this.activeStockTake?.sessionNumber || 1}
                                             </span>
                                         </div>
@@ -3885,8 +3885,8 @@
                                                 }
                                                 return '';
                                             })()}
-                                            <span class="text-xs font-medium flex items-center gap-1 ${this.isOfflineMode() ? 'text-amber-600' : 'text-emerald-600'}">
-                                                <span class="w-1.5 h-1.5 rounded-full ${this.isOfflineMode() ? 'bg-amber-500' : 'bg-emerald-500'} animate-pulse"></span>
+                                            <span class="text-xs font-medium flex items-center gap-1 ${this.isOfflineMode() ? 'text-slate-500' : 'text-emerald-600'}">
+                                                <span class="w-1.5 h-1.5 rounded-full ${this.isOfflineMode() ? 'bg-slate-400' : 'bg-emerald-500'} animate-pulse"></span>
                                                 ${this.isOfflineMode() ? 'Offline cache' : 'Online'}
                                             </span>
                                         </div>
@@ -3925,7 +3925,7 @@
                                             </button>
                                         ` : ''}
                                         ${this.activeStockTake ? `
-                                            <button onclick="app.toggleSessionPause()" class="${this.activeStockTake.status === 'paused' ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'} px-4 py-2 rounded-xl text-sm font-bold transition-colors">
+                                            <button onclick="app.toggleSessionPause()" class="${this.activeStockTake.status === 'paused' ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'} px-4 py-2 rounded-xl text-sm font-bold transition-colors">
                                                 ${this.activeStockTake.status === 'paused' ? 'Resume' : 'Pause'}
                                             </button>
                                         ` : ''}
@@ -3967,7 +3967,7 @@
                             ` : ''}
                             
                             ${this.sessionSettings.locationScanningEnabled ? `
-                                <button onclick="app.promptForLocation()" class="mt-3 w-full flex items-center justify-center gap-2 text-xs font-medium ${this.sessionSettings.currentLocation ? 'text-blue-600 bg-blue-50/50 border-blue-100/50' : 'text-amber-600 bg-amber-50/50 border-amber-100/50'} py-2 rounded-lg border">
+                                <button onclick="app.promptForLocation()" class="mt-3 w-full flex items-center justify-center gap-2 text-xs font-medium ${this.sessionSettings.currentLocation ? 'text-blue-600 bg-blue-50/50 border-blue-100/50' : 'text-slate-500 bg-slate-50/50 border-slate-200/50'} py-2 rounded-lg border">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -4001,7 +4001,7 @@
                                     isExpired = expiry <= today;
                                     expiryDisplay = expiry.toLocaleDateString();
                                 }
-                                const borderColor = isExpired ? 'bg-red-500' : (scan.actualCases !== scan.casesOnPallet ? 'bg-amber-500' : 'bg-emerald-500');
+                                const borderColor = isExpired ? 'bg-red-500' : (scan.actualCases !== scan.casesOnPallet ? 'bg-yellow-500' : 'bg-emerald-500');
                                 return `
                                 <div class="bg-white rounded-2xl p-4 shadow-sm border ${isExpired ? 'border-red-200 bg-red-50' : 'border-slate-100'} relative overflow-hidden group">
                                     <div class="absolute top-0 left-0 w-1 h-full ${borderColor}"></div>
@@ -4011,7 +4011,7 @@
                                                 <span class="font-mono text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
                                                     ${scan.batchNumber || 'N/A'}
                                                 </span>
-                                                <span class="text-sm font-bold ${this.activeStockTake?.sessionType === 'RM' ? 'text-amber-600' : 'text-indigo-600'} truncate">${scan.stockCode}</span>
+                                                <span class="text-sm font-bold ${this.activeStockTake?.sessionType === 'RM' ? 'text-teal-600' : 'text-blue-600'} truncate">${scan.stockCode}</span>
                                                 ${isExpired ? `
                                                     <span class="px-2 py-0.5 text-xs font-bold bg-red-500 text-white rounded-full animate-pulse">
                                                         EXPIRED
@@ -4063,7 +4063,7 @@
                                         
                                         <div class="flex flex-col items-end gap-3 ml-3">
                                             <div class="text-right">
-                                                <div class="text-2xl font-black ${isExpired ? 'text-red-600' : (scan.actualCases !== scan.casesOnPallet ? 'text-amber-600' : 'text-emerald-600')}">
+                                                <div class="text-2xl font-black ${isExpired ? 'text-red-600' : (scan.actualCases !== scan.casesOnPallet ? 'text-yellow-600' : 'text-emerald-600')}">
                                                     ${scan.actualCases}
                                                 </div>
                                                 <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">${scan.unitType === 'kg' ? 'KG' : (scan.unitType === 'units' ? 'UN' : 'Cases')}</div>
@@ -4083,7 +4083,7 @@
 
                         <!-- Floating Action Button -->
                         <div class="fixed bottom-6 left-4 right-4 z-40">
-                            <button onclick="app.startScanning()" class="w-full bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white py-4 rounded-2xl text-lg font-bold shadow-xl shadow-indigo-200 transition-all flex items-center justify-center gap-3">
+                            <button onclick="app.startScanning()" class="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white py-4 rounded-2xl text-lg font-bold shadow-xl shadow-blue-200 transition-all flex items-center justify-center gap-3">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
                                 </svg>
