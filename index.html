@@ -1942,7 +1942,13 @@
                     aisle: null,
                     rack: null
                 };
-                console.log('Saving scan:', { parsedData, actualCases, userName, useNeonDB: this.useNeonDB, isGitHubPages: this.isGitHubPages, sessionType, sessionId });
+                console.log('Saving scan:', { parsedData, actualCases, userName, useNeonDB: this.useNeonDB, isGitHubPages: this.isGitHubPages, sessionType, sessionId, supabaseEnabled: !!supabase });
+                
+                // Check if we have a valid session for Supabase saves
+                if (!this.useNeonDB && supabase && !sessionId) {
+                    console.warn('No active session ID - scan will be saved to localStorage only');
+                    alert('No active session. Please start or join a session first. Scan saved locally.');
+                }
                 
                 if (this.useNeonDB) {
                     const result = await db.insertStockScan({
@@ -1971,6 +1977,7 @@
                     console.log('Insert result:', result);
                 } else if (supabase && sessionId) {
                     // Save ALL scans to stock_scans table
+                    console.log('Saving to Supabase with sessionId:', sessionId);
                     try {
                         const record = {
                             session_id: sessionId,
@@ -2014,6 +2021,7 @@
                     }
                 } else {
                     // Fallback to localStorage (offline mode)
+                    console.log('Saving to localStorage (no session or Supabase not available)', { supabase: !!supabase, sessionId });
                     const scan = {
                         id: 'scan:' + Date.now(),
                         timestamp: Date.now(),
