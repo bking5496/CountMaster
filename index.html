@@ -1510,19 +1510,19 @@
                             // Session might not exist in Supabase, just update locally
                             console.log('Session not found in Supabase, updating locally only');
                         } else if (existingSession) {
-                            // Update session status in Supabase
+                            // Update session status in Supabase (use completed_at, not ended_at)
                             const { error: updateError } = await supabase
                                 .from('stock_takes')
                                 .update({ 
                                     status: 'completed',
-                                    ended_at: new Date().toISOString()
+                                    completed_at: new Date().toISOString()
                                 })
                                 .eq('id', sessionId);
                             
                             if (updateError) {
                                 console.error('Error updating session in Supabase:', updateError);
-                                alert('Failed to end session in cloud: ' + updateError.message);
-                                // Continue to update locally anyway
+                                // Don't show alert for cloud errors, just log and continue locally
+                                console.log('Continuing with local update only');
                             } else {
                                 console.log('Session ended in Supabase successfully');
                             }
@@ -4898,21 +4898,12 @@
                             </div>
                         </div>
 
-                        <!-- Floating Buttons - Bottom Right -->
-                        <div class="fixed bottom-6 right-6 flex flex-col gap-3 z-40">
-                            <!-- New Session Button -->
-                            <button onclick="app.showingStartStockTake = true; app.selectedStockTakeType = null; app.render();" class="w-12 h-12 ${this.activeStockTake?.sessionType === 'RM' ? 'bg-teal-500 hover:bg-teal-600 shadow-teal-200' : 'bg-blue-500 hover:bg-blue-600 shadow-blue-200'} active:scale-95 text-white rounded-full shadow-lg flex items-center justify-center transition-all" title="New Session">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                                </svg>
-                            </button>
-                            <!-- Scan Button -->
-                            <button onclick="app.startScanning()" class="w-16 h-16 ${this.activeStockTake?.sessionType === 'RM' ? 'bg-teal-600 hover:bg-teal-700 shadow-teal-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'} active:scale-95 text-white rounded-full shadow-xl flex items-center justify-center transition-all">
-                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
-                                </svg>
-                            </button>
-                        </div>
+                        <!-- Floating Scan Button - Bottom Right -->
+                        <button onclick="app.startScanning()" class="fixed bottom-6 right-6 w-16 h-16 ${this.activeStockTake?.sessionType === 'RM' ? 'bg-teal-600 hover:bg-teal-700 shadow-teal-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'} active:scale-95 text-white rounded-full shadow-xl z-40 flex items-center justify-center transition-all">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+                            </svg>
+                        </button>
                     </div>
                 `);
             }
