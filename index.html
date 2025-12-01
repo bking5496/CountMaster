@@ -2545,7 +2545,7 @@
                                 site: locationPayload.site,
                                 aisle: locationPayload.aisle,
                                 rack: locationPayload.rack,
-                                unit_type: parsedData.unitType || (sessionType === 'RM' ? 'kg' : 'cases'),
+                                unit_type: parsedData.unitType || (sessionType === 'RM' ? getUnitTypeForStockCode(parsedData.stockCode) : 'cases'),
                                 actual_cases: actualCases,
                                 pallet_number: parsedData.palletNumber || null,
                                 cases_on_pallet: parsedData.casesOnPallet || null,
@@ -2896,10 +2896,15 @@
                                             return;
                                         }
                                         
+                                        // Generate a 13-digit raw code for manual entry
+                                        // Format: 5-digit batch + 8-digit timestamp (last 8 chars of epoch)
+                                        const timestamp = Date.now().toString().slice(-8);
+                                        const rawCode = code.padStart(5, '0') + timestamp;
+                                        
                                         // Create a manual entry scan object
                                         const manualScan = {
                                             valid: true,
-                                            raw: `MANUAL:${code}`,
+                                            raw: rawCode, // 13-digit code for database constraint
                                             batchNumber: code,
                                             palletNumber: 'MANUAL',
                                             casesOnPallet: cases,
