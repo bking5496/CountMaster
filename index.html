@@ -1497,40 +1497,45 @@
                     type: 'confirm',
                     confirmText: 'End Session',
                     cancelText: 'Cancel',
-                    onConfirm: async () => {
-                        try {
-                            if (supabaseSessionsEnabled && supabase) {
-                                // Update session status in Supabase
-                                const { error } = await supabase
-                                    .from('stock_sessions')
-                                    .update({ 
-                                        status: 'completed',
-                                        ended_at: new Date().toISOString()
-                                    })
-                                    .eq('id', sessionId);
-                                
-                                if (error) {
-                                    console.error('Error ending session:', error);
-                                    alert('Failed to end session. Please try again.');
-                                    return;
-                                }
-                            }
-                            
-                            // Update local storage
-                            const sessionDate = this.currentTakeDate;
-                            await updateSession(sessionDate, sessionId, { status: 'completed' });
-                            
-                            // Refresh the session list
-                            await this.refreshSessionsFromSupabase();
-                            this.render();
-                            
-                            alert('Session ended successfully.');
-                        } catch (err) {
-                            console.error('Error ending session:', err);
-                            alert('Failed to end session. Please try again.');
-                        }
+                    onConfirm: () => {
+                        // Execute the async operation after modal closes
+                        this._executeEndSession(sessionId);
                     }
                 });
+            }
+            
+            async _executeEndSession(sessionId) {
+                try {
+                    if (supabaseSessionsEnabled && supabase) {
+                        // Update session status in Supabase
+                        const { error } = await supabase
+                            .from('stock_sessions')
+                            .update({ 
+                                status: 'completed',
+                                ended_at: new Date().toISOString()
+                            })
+                            .eq('id', sessionId);
+                        
+                        if (error) {
+                            console.error('Error ending session:', error);
+                            alert('Failed to end session: ' + error.message);
+                            return;
+                        }
+                    }
+                    
+                    // Update local storage
+                    const sessionDate = this.currentTakeDate;
+                    await updateSession(sessionDate, sessionId, { status: 'completed' });
+                    
+                    // Refresh the session list
+                    await this.refreshSessionsFromSupabase();
+                    this.render();
+                    
+                    alert('Session ended successfully.');
+                } catch (err) {
+                    console.error('Error ending session:', err);
+                    alert('Failed to end session: ' + (err.message || 'Unknown error'));
+                }
             }
 
             async ensureStockTake() {
@@ -1741,8 +1746,8 @@
                 }
                 
                 // RM (Raw Materials) - starts with a letter
-                // First QR = stock code only (e.g., "ABC123")
-                // Second QR = string with stock code + batch (e.g., "ABC123-BATCH456" or "ABC123BATCH456")
+                // Barcode format: STOCKCODE + BATCH + optional EXPIRY (DD/MM/YY)
+                // If stock code not in database, user will be prompted to scan stock code first
                 if (sessionType === 'RM') {
                     // Check if it starts with a letter (RM code)
                     if (!/^[A-Za-z]/.test(code)) {
@@ -1753,21 +1758,23 @@
                         };
                     }
                     
-                    // Store first scan as pending if we only got stock code
-                    // Check if this is a stock code or full batch string
-                    const stockCodeMatch = code.match(/^([A-Za-z][A-Za-z0-9\-]*)/);
-                    if (!stockCodeMatch) {
-                        return {
-                            valid: false,
-                            raw: code,
-                            error: 'Invalid RM code format'
-                        };
+                    // Try to extract expiry date from end of string (format: DD/MM/YY)
+                    const expiryMatch = code.match(/(\d{2}\/\d{2}\/\d{2})$/);
+                    let extractedExpiry = null;
+                    let codeWithoutExpiry = code;
+                    
+                    if (expiryMatch) {
+                        extractedExpiry = expiryMatch[1];
+                        codeWithoutExpiry = code.substring(0, code.length - 8).trim(); // Remove expiry and any trailing space
                     }
                     
                     // Try to find the stock code in database
                     let foundStockCode = null;
                     let batchNumber = null;
                     let batchFromDatabase = false;
+                    let needsStockCodeScan = false;
+                    let needsBatchConfirmation = false;
+                    let needsExpiryConfirmation = false;
                     
                     // First, try to match known stock codes
                     const knownStockCodes = Object.keys(rawMaterialsDatabase).sort((a, b) => b.length - a.length);
@@ -1800,16 +1807,32 @@
                         }
                     }
                     
-                    // If not found in database, try to parse the code
+                    // If not found in database, mark as needing stock code scan
                     if (!foundStockCode) {
-                        // Assume format is either:
-                        // 1. Just stock code: "ABC123"
-                        // 2. Stock code + separator + batch: "ABC123-BATCH456" or "ABC123_BATCH456"
-                        const parts = code.split(/[\-_]/);
+                        // Stock code not in database - user needs to scan stock code first
+                        needsStockCodeScan = true;
+                        
+                        // Try to parse what we can from the code
+                        const parts = codeWithoutExpiry.split(/[\-_\s]+/);
                         if (parts.length >= 1) {
                             foundStockCode = parts[0];
-                            batchNumber = parts.slice(1).join('-') || null;
+                            // Everything after the first part could be batch
+                            const potentialBatch = parts.slice(1).join('-') || null;
+                            if (potentialBatch) {
+                                batchNumber = potentialBatch;
+                                needsBatchConfirmation = true;
+                            }
                         }
+                    }
+                    
+                    // If we extracted expiry from end of string, use it but need confirmation
+                    if (extractedExpiry) {
+                        needsExpiryConfirmation = true;
+                    }
+                    
+                    // Also need batch confirmation if batch was extracted but not from database
+                    if (batchNumber && !batchFromDatabase) {
+                        needsBatchConfirmation = true;
                     }
                     
                     if (!foundStockCode) {
@@ -1822,15 +1845,14 @@
                     
                     // Look up product info
                     const rmInfo = rawMaterialsDatabase[foundStockCode] || rawMaterialsDatabase[foundStockCode.toUpperCase()];
-                    const description = rmInfo?.description || 'Unknown Raw Material - Add to database';
+                    const description = rmInfo?.description || 'Unknown Raw Material';
                     
                     // Determine unit type based on stock code prefix
                     const unitType = getUnitTypeForStockCode(foundStockCode);
                     
-                    // Check for expiry dates if batch number is known
-                    let expiryDate = null;
+                    // Check for expiry dates if batch number is known from database
+                    let expiryDate = extractedExpiry || null;
                     let availableExpiryDates = [];
-                    let needsExpiryConfirmation = false;
                     
                     if (rmInfo && batchNumber && rmInfo.batches && rmInfo.batches[batchNumber]) {
                         const batchInfo = rmInfo.batches[batchNumber];
@@ -1839,6 +1861,7 @@
                             availableExpiryDates = batchInfo.expiryDates.filter(d => d != null);
                             if (availableExpiryDates.length === 1) {
                                 expiryDate = availableExpiryDates[0];
+                                needsExpiryConfirmation = false; // Found in database
                             } else if (availableExpiryDates.length > 1) {
                                 // Multiple expiry dates - need confirmation
                                 needsExpiryConfirmation = true;
@@ -1847,6 +1870,7 @@
                             // Old format - single expiry date
                             expiryDate = batchInfo.expiryDate;
                             availableExpiryDates = [expiryDate];
+                            needsExpiryConfirmation = false; // Found in database
                         }
                     }
                     
@@ -1854,13 +1878,16 @@
                         valid: true,
                         raw: code,
                         stockCode: foundStockCode,
-                        batchNumber: batchNumber || 'N/A',
+                        batchNumber: batchNumber || null,
                         palletNumber: null, // RM doesn't use pallets
                         casesOnPallet: 0, // Will be entered as quantity
                         description: description,
                         expiryDate: expiryDate,
+                        extractedExpiry: extractedExpiry, // Keep original extracted value
                         availableExpiryDates: availableExpiryDates,
                         needsExpiryConfirmation: needsExpiryConfirmation,
+                        needsBatchConfirmation: needsBatchConfirmation,
+                        needsStockCodeScan: needsStockCodeScan,
                         isRawMaterial: true,
                         unitType: unitType // 'kg' or 'units'
                     };
@@ -2034,6 +2061,98 @@
                     this.render();
                     return;
                 }
+                
+                const sessionType = this.activeStockTake?.sessionType || 'FP';
+                
+                // For RM: Handle stock code not found in database
+                if (sessionType === 'RM' && parsed.needsStockCodeScan) {
+                    // Prompt user to scan stock code barcode to confirm
+                    this.showModal({
+                        title: '📦 Unknown Product',
+                        message: `This product is not in the database.\n\nScanned: ${parsed.raw}\n\nPlease scan the STOCK CODE barcode to confirm the stock code.`,
+                        type: 'input',
+                        confirmText: 'Confirm Stock Code',
+                        cancelText: 'Cancel',
+                        onConfirm: (formData) => {
+                            const confirmedStockCode = formData.value?.trim();
+                            if (confirmedStockCode) {
+                                parsed.stockCode = confirmedStockCode;
+                                parsed.needsStockCodeScan = false;
+                                // Re-extract batch from remaining string
+                                if (parsed.raw.toUpperCase().startsWith(confirmedStockCode.toUpperCase())) {
+                                    const remaining = parsed.raw.substring(confirmedStockCode.length);
+                                    // Remove expiry from end if present
+                                    let batchPart = remaining;
+                                    if (parsed.extractedExpiry) {
+                                        batchPart = batchPart.replace(parsed.extractedExpiry, '').trim();
+                                    }
+                                    batchPart = batchPart.replace(/^[\-_\s]+/, '').trim();
+                                    if (batchPart) {
+                                        parsed.batchNumber = batchPart;
+                                        parsed.needsBatchConfirmation = true;
+                                    }
+                                }
+                                // Continue to batch confirmation
+                                this._continueRMScan(parsed, scanKey);
+                            }
+                        }
+                    });
+                    return;
+                }
+                
+                // For RM: Handle batch confirmation 
+                if (sessionType === 'RM' && parsed.needsBatchConfirmation && parsed.batchNumber) {
+                    this.showModal({
+                        title: '🏷️ Confirm Batch Number',
+                        message: `Stock Code: ${parsed.stockCode}\n\nExtracted Batch: ${parsed.batchNumber}\n\nPlease confirm or correct the batch number:`,
+                        type: 'input',
+                        confirmText: 'Confirm Batch',
+                        cancelText: 'Cancel',
+                        onConfirm: (formData) => {
+                            const confirmedBatch = formData.value?.trim() || parsed.batchNumber;
+                            parsed.batchNumber = confirmedBatch;
+                            parsed.needsBatchConfirmation = false;
+                            // Continue to expiry confirmation
+                            this._continueRMScan(parsed, scanKey);
+                        }
+                    });
+                    // Pre-fill the input with extracted batch
+                    setTimeout(() => {
+                        const input = document.getElementById('modal-input');
+                        if (input) input.value = parsed.batchNumber;
+                    }, 100);
+                    return;
+                }
+                
+                // For RM: Handle expiry confirmation from barcode
+                if (sessionType === 'RM' && parsed.needsExpiryConfirmation && parsed.extractedExpiry) {
+                    this.showModal({
+                        title: '📅 Confirm Expiry Date',
+                        message: `Stock Code: ${parsed.stockCode}\nBatch: ${parsed.batchNumber}\n\nExtracted Expiry: ${parsed.extractedExpiry}\n(Format: DD/MM/YY)\n\nPlease confirm or correct the expiry date:`,
+                        type: 'input',
+                        confirmText: 'Confirm Expiry',
+                        cancelText: 'No Expiry',
+                        onConfirm: (formData) => {
+                            const confirmedExpiry = formData.value?.trim() || parsed.extractedExpiry;
+                            parsed.expiryDate = confirmedExpiry;
+                            parsed.needsExpiryConfirmation = false;
+                            // Continue to duplicate check and case entry
+                            this._continueRMScan(parsed, scanKey);
+                        },
+                        onCancel: () => {
+                            // User said no expiry
+                            parsed.expiryDate = null;
+                            parsed.needsExpiryConfirmation = false;
+                            this._continueRMScan(parsed, scanKey);
+                        }
+                    });
+                    // Pre-fill the input with extracted expiry
+                    setTimeout(() => {
+                        const input = document.getElementById('modal-input');
+                        if (input) input.value = parsed.extractedExpiry;
+                    }, 100);
+                    return;
+                }
 
                 // Check for duplicate - include stock_code and expiry for RM
                 const duplicate = await this.checkDuplicate(
@@ -2050,8 +2169,6 @@
                     const existingCases = duplicate.actual_cases || duplicate.actualCases || 0;
                     
                     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                    
-                    const sessionType = this.activeStockTake?.sessionType || 'FP';
                     
                     // For FP, pallet cannot be scanned twice - must update
                     if (sessionType === 'FP') {
@@ -2105,6 +2222,102 @@
                 // Mark this scan as pending to prevent double-capture
                 this.pendingScanKeys.add(scanKey);
                 
+                this.currentScan = parsed;
+                this.showingCaseEntry = true;
+                this.render();
+            }
+            
+            // Continue RM scan after confirmations
+            async _continueRMScan(parsed, scanKey) {
+                // Check if more confirmations are needed
+                if (parsed.needsStockCodeScan) {
+                    // Re-trigger stock code confirmation
+                    await this.onScanSuccess(parsed.raw);
+                    return;
+                }
+                
+                if (parsed.needsBatchConfirmation) {
+                    // Re-trigger batch confirmation
+                    this.showModal({
+                        title: '🏷️ Confirm Batch Number',
+                        message: `Stock Code: ${parsed.stockCode}\n\nExtracted Batch: ${parsed.batchNumber}\n\nPlease confirm or correct the batch number:`,
+                        type: 'input',
+                        confirmText: 'Confirm Batch',
+                        cancelText: 'Cancel',
+                        onConfirm: (formData) => {
+                            const confirmedBatch = formData.value?.trim() || parsed.batchNumber;
+                            parsed.batchNumber = confirmedBatch;
+                            parsed.needsBatchConfirmation = false;
+                            this._continueRMScan(parsed, scanKey);
+                        }
+                    });
+                    setTimeout(() => {
+                        const input = document.getElementById('modal-input');
+                        if (input) input.value = parsed.batchNumber || '';
+                    }, 100);
+                    return;
+                }
+                
+                if (parsed.needsExpiryConfirmation && parsed.extractedExpiry) {
+                    // Re-trigger expiry confirmation  
+                    this.showModal({
+                        title: '📅 Confirm Expiry Date',
+                        message: `Stock Code: ${parsed.stockCode}\nBatch: ${parsed.batchNumber}\n\nExtracted Expiry: ${parsed.extractedExpiry}\n(Format: DD/MM/YY)\n\nPlease confirm or correct:`,
+                        type: 'input',
+                        confirmText: 'Confirm Expiry',
+                        cancelText: 'No Expiry',
+                        onConfirm: (formData) => {
+                            const confirmedExpiry = formData.value?.trim() || parsed.extractedExpiry;
+                            parsed.expiryDate = confirmedExpiry;
+                            parsed.needsExpiryConfirmation = false;
+                            this._continueRMScan(parsed, scanKey);
+                        },
+                        onCancel: () => {
+                            parsed.expiryDate = null;
+                            parsed.needsExpiryConfirmation = false;
+                            this._continueRMScan(parsed, scanKey);
+                        }
+                    });
+                    setTimeout(() => {
+                        const input = document.getElementById('modal-input');
+                        if (input) input.value = parsed.extractedExpiry || '';
+                    }, 100);
+                    return;
+                }
+                
+                // All confirmations done - check for duplicate
+                const duplicate = await this.checkDuplicate(
+                    parsed.batchNumber, 
+                    parsed.palletNumber,
+                    parsed.stockCode,
+                    parsed.expiryDate
+                );
+                
+                if (duplicate) {
+                    const timestamp = duplicate.scanned_at || duplicate.created_at || duplicate.date + ' ' + duplicate.time;
+                    const scannedByName = duplicate.scanned_by || duplicate.scannedBy || 'Unknown';
+                    const deviceInfo = duplicate.device_id || duplicate.deviceId || '';
+                    
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                    
+                    const rescan = confirm(
+                        `⚠️ DUPLICATE SCAN DETECTED!\n\n` +
+                        `Stock Code: ${parsed.stockCode}\n` +
+                        `Batch: ${parsed.batchNumber}\n` +
+                        (parsed.expiryDate ? `Expiry: ${parsed.expiryDate}\n` : '') +
+                        `\nPreviously scanned by: ${scannedByName}\n` +
+                        (deviceInfo ? `Device: ${deviceInfo}\n` : '') +
+                        `at ${new Date(timestamp).toLocaleString()}\n\n` +
+                        `Do you want to rescan this item?`
+                    );
+                    
+                    if (!rescan) {
+                        return;
+                    }
+                }
+                
+                // Proceed to case entry
+                this.pendingScanKeys.add(scanKey);
                 this.currentScan = parsed;
                 this.showingCaseEntry = true;
                 this.render();
@@ -3234,7 +3447,15 @@
             }
 
             closeModal() {
+                // Save callback before clearing modal state
+                const onCancelCallback = this.modalState?.onCancel;
                 this.modalState = null;
+                
+                // Call onCancel callback if provided
+                if (onCancelCallback) {
+                    onCancelCallback();
+                }
+                
                 // Check if a render was deferred during sync while modal was open
                 if (this._pendingRender) {
                     this._pendingRender = false;
@@ -4670,12 +4891,21 @@
                             </div>
                         </div>
 
-                        <!-- Floating Scan Button - Bottom Right -->
-                        <button onclick="app.startScanning()" class="fixed bottom-6 right-6 w-16 h-16 ${this.activeStockTake?.sessionType === 'RM' ? 'bg-teal-600 hover:bg-teal-700 shadow-teal-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'} active:scale-95 text-white rounded-full shadow-xl z-40 flex items-center justify-center transition-all">
-                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
-                            </svg>
-                        </button>
+                        <!-- Floating Buttons - Bottom Right -->
+                        <div class="fixed bottom-6 right-6 flex flex-col gap-3 z-40">
+                            <!-- New Session Button -->
+                            <button onclick="app.showingStartStockTake = true; app.selectedStockTakeType = null; app.render();" class="w-12 h-12 ${this.activeStockTake?.sessionType === 'RM' ? 'bg-teal-500 hover:bg-teal-600 shadow-teal-200' : 'bg-blue-500 hover:bg-blue-600 shadow-blue-200'} active:scale-95 text-white rounded-full shadow-lg flex items-center justify-center transition-all" title="New Session">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                </svg>
+                            </button>
+                            <!-- Scan Button -->
+                            <button onclick="app.startScanning()" class="w-16 h-16 ${this.activeStockTake?.sessionType === 'RM' ? 'bg-teal-600 hover:bg-teal-700 shadow-teal-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'} active:scale-95 text-white rounded-full shadow-xl flex items-center justify-center transition-all">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 `);
             }
