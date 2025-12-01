@@ -1506,26 +1506,44 @@
             
             async _executeEndSession(sessionId) {
                 try {
+                    console.log('Attempting to end session:', sessionId);
+                    
                     if (supabaseSessionsEnabled && supabase) {
-                        // Update session status in Supabase
-                        const { error } = await supabase
-                            .from('stock_sessions')
-                            .update({ 
-                                status: 'completed',
-                                ended_at: new Date().toISOString()
-                            })
-                            .eq('id', sessionId);
+                        // First check if the session exists in stock_takes
+                        const { data: existingSession, error: fetchError } = await supabase
+                            .from('stock_takes')
+                            .select('id, status')
+                            .eq('id', sessionId)
+                            .single();
                         
-                        if (error) {
-                            console.error('Error ending session:', error);
-                            alert('Failed to end session: ' + error.message);
-                            return;
+                        if (fetchError) {
+                            console.error('Error fetching session:', fetchError);
+                            // Session might not exist in Supabase, just update locally
+                            console.log('Session not found in Supabase, updating locally only');
+                        } else if (existingSession) {
+                            // Update session status in Supabase
+                            const { error: updateError } = await supabase
+                                .from('stock_takes')
+                                .update({ 
+                                    status: 'completed',
+                                    ended_at: new Date().toISOString()
+                                })
+                                .eq('id', sessionId);
+                            
+                            if (updateError) {
+                                console.error('Error updating session in Supabase:', updateError);
+                                alert('Failed to end session in cloud: ' + updateError.message);
+                                // Continue to update locally anyway
+                            } else {
+                                console.log('Session ended in Supabase successfully');
+                            }
                         }
                     }
                     
                     // Update local storage
                     const sessionDate = this.currentTakeDate;
                     await updateSession(sessionDate, sessionId, { status: 'completed' });
+                    console.log('Session ended in local storage');
                     
                     // Refresh the session list
                     await this.refreshSessionsFromSupabase();
