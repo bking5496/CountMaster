@@ -1099,6 +1099,7 @@
                 this.selectedStockTakeType = null; // 'FP' or 'RM' - selected before session
                 this.historySessions = [];
                 this.historyScans = [];
+                this.historyLoading = false; // Loading state for session history
                 this.selectedHistorySession = null;
                 this.pendingScan = null;
                 this.pendingScanKeys = new Set(); // Track scans being processed to prevent double-capture
@@ -2570,31 +2571,38 @@
             }
 
             async loadSessionHistory(sessionId) {
-                this.historyScans = [];
-                
-                // Find the session
+                // Find the session first
                 const session = this.historySessions.find(s => s.id === sessionId);
                 if (!session) {
                     alert('Session not found');
                     return;
                 }
                 
+                // Set session and show loading state immediately (don't clear scans yet)
                 this.selectedHistorySession = session;
+                this.historyLoading = true;
+                this.render(); // Show loading indicator immediately
                 
                 if (!supabase) {
+                    this.historyLoading = false;
+                    this.historyScans = [];
                     alert('Session history requires Supabase connectivity.');
+                    this.render();
                     return;
                 }
 
                 if (!this.isBrowserOnline) {
+                    this.historyLoading = false;
+                    this.historyScans = [];
                     alert('Session history is unavailable while offline.');
+                    this.render();
                     return;
                 }
 
                 try {
                     const { data, error } = await supabase
                         .from('stock_scans')
-                        .select('*')
+                        .select('id,batch_number,stock_code,description,actual_cases,pallet_number,location,site,aisle,rack,expiry_date,unit_type,scanned_at,scanned_by')
                         .eq('session_id', sessionId)
                         .order('scanned_at', { ascending: true });
                     
@@ -2619,9 +2627,11 @@
                 } catch (error) {
                     console.error('Error loading history scans:', error);
                     await logClientEvent('history-load-failed', 'error', sessionId, { message: error.message });
+                    this.historyScans = [];
                     alert('Error loading session scans. Check console for details.');
                 }
                 
+                this.historyLoading = false;
                 this.render();
             }
 
@@ -3886,12 +3896,22 @@
                                                     Export
                                                 </button>
                                             </div>
-                                            <div class="text-sm text-blue-700 font-medium">${this.historyScans.length} scan(s)</div>
+                                            <div class="text-sm text-blue-700 font-medium">${this.historyLoading ? '<span class="inline-flex items-center gap-1"><svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>Loading...</span>' : `${this.historyScans.length} scan(s)`}</div>
                                         </div>
                                         
                                         <!-- Scans List -->
                                         <div class="max-h-80 overflow-y-auto">
-                                            ${this.historyScans.length > 0 ? this.historyScans.map((scan, idx) => `
+                                            ${this.historyLoading ? `
+                                                <div class="p-8 text-center">
+                                                    <div class="inline-flex items-center gap-3">
+                                                        <svg class="w-5 h-5 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+                                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                        </svg>
+                                                        <span class="text-slate-500 font-medium">Loading scans...</span>
+                                                    </div>
+                                                </div>
+                                            ` : this.historyScans.length > 0 ? this.historyScans.map((scan, idx) => `
                                                 <div class="p-3 border-b border-slate-100 hover:bg-slate-50">
                                                     <div class="flex items-center justify-between">
                                                         <div class="flex-1">
@@ -3921,7 +3941,7 @@
                                         </div>
                                         
                                         <div class="p-4 border-t border-slate-100">
-                                            <button onclick="app.selectedHistorySession = null; app.historyScans = []; app.render();" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-sm font-bold transition-colors">
+                                            <button onclick="app.selectedHistorySession = null; app.historyScans = []; app.historyLoading = false; app.render();" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-sm font-bold transition-colors">
                                                 ← Back to Sessions
                                             </button>
                                         </div>
