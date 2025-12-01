@@ -3462,28 +3462,28 @@
                     
                     this._unknownStockScannerStream = stream;
                     
+                    // Store the original scanned code to ignore it
+                    const originalCode = this._unknownStockParsed?.raw || '';
+                    
                     // Use BarcodeDetector if available
                     if ('BarcodeDetector' in window) {
                         const detector = new BarcodeDetector({ formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code'] });
-                        
-                        // Add delay before starting detection to prevent instant re-scan of the same barcode
-                        let scanningEnabled = false;
-                        setTimeout(() => { scanningEnabled = true; }, 2000);
 
                         const scanFrame = async () => {
                             if (!this._unknownStockScannerStream) return;
                             
-                            if (scanningEnabled) {
-                                try {
-                                    const barcodes = await detector.detect(video);
-                                    if (barcodes.length > 0) {
-                                        const stockCode = barcodes[0].rawValue;
+                            try {
+                                const barcodes = await detector.detect(video);
+                                if (barcodes.length > 0) {
+                                    const stockCode = barcodes[0].rawValue;
+                                    // Only accept if it's DIFFERENT from the original scan
+                                    if (stockCode !== originalCode && !originalCode.includes(stockCode) && !stockCode.includes(originalCode)) {
                                         this.finishUnknownStockScan(stockCode);
                                         return;
                                     }
-                                } catch (err) {
-                                    // Ignore detection errors
                                 }
+                            } catch (err) {
+                                // Ignore detection errors
                             }
                             
                             if (this._unknownStockScannerStream) {
