@@ -2122,14 +2122,18 @@
                 const isKg = this.currentScan?.unitType === 'kg';
                 const actualCases = isKg ? parseFloat(input.value) : parseInt(input.value);
                 
+                console.log('submitCaseCount called:', { value: input?.value, isKg, actualCases, currentScan: this.currentScan });
+                
                 if (isNaN(actualCases) || actualCases < 0) {
                     alert(isKg ? 'Please enter a valid weight in kg' : 'Please enter a valid quantity');
                     return;
                 }
 
                 const save = async () => {
+                    console.log('save() called, about to call saveScan');
                     try {
                         await this.saveScan(this.currentScan, actualCases);
+                        console.log('saveScan completed successfully');
                     } catch (err) {
                         console.error('Save scan error:', err);
                         alert('Failed to save scan. Please try again.');
@@ -2137,12 +2141,14 @@
                 };
 
                 if ((this.activeStockTake?.sessionType === 'RM' || this.currentScan?.isRawMaterial) && !this.currentScan?.expiryDate) {
+                    console.log('RM scan without expiry - showing modal');
                     this.showModal({
                         title: 'Expiry Date Required',
                         message: 'Enter expiry date (YYYY-MM-DD) or leave blank:',
                         type: 'input',
                         confirmText: 'Continue',
                         onConfirm: (data) => {
+                            console.log('Expiry modal onConfirm called:', data);
                             const manualExpiry = data.value;
                             if (manualExpiry && manualExpiry.trim() !== '') {
                                 const parsedDate = new Date(manualExpiry.trim());
@@ -2151,8 +2157,10 @@
                                     return;
                                 }
                                 this.currentScan.expiryDate = parsedDate.toISOString().split('T')[0];
+                                console.log('Calling save with expiry:', this.currentScan.expiryDate);
                                 save();
                             } else {
+                                console.log('No expiry entered - showing confirmation modal');
                                 this.showModal({
                                     title: 'Confirm No Expiry',
                                     message: 'No expiry date will be recorded. Continue?',
@@ -2160,6 +2168,7 @@
                                     confirmText: 'Yes, Continue',
                                     cancelText: 'Go Back',
                                     onConfirm: () => {
+                                        console.log('No-expiry confirmation - calling save');
                                         save();
                                     }
                                 });
@@ -2933,10 +2942,18 @@
                     });
                 }
                 
-                if (this.modalState.onConfirm) {
-                    this.modalState.onConfirm(formData);
+                // Save the callback before closing modal (in case callback shows a new modal)
+                const onConfirmCallback = this.modalState.onConfirm;
+                this.modalState = null; // Clear modal state first
+                
+                if (onConfirmCallback) {
+                    onConfirmCallback(formData);
                 }
-                this.closeModal();
+                
+                // Only render if no new modal was opened
+                if (!this.modalState) {
+                    this.render();
+                }
             }
 
             renderModal() {
