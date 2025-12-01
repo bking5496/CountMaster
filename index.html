@@ -2046,6 +2046,32 @@
                 
                 this.stopScanning();
                 
+                // Check if we're waiting for a stock code scan (unknown product flow)
+                if (this._waitingForStockCodeScan && this._unknownStockParsed) {
+                    this._waitingForStockCodeScan = false;
+                    const stockCode = cleanedCode;
+                    
+                    // Don't accept the same code as the original
+                    const originalCode = this._unknownStockParsed.raw || '';
+                    if (stockCode === originalCode) {
+                        this.showModal({
+                            title: '⚠️ Same Barcode',
+                            message: 'You scanned the same barcode again.\n\nPlease scan the separate STOCK CODE barcode.',
+                            type: 'alert',
+                            confirmText: 'Try Again',
+                            onConfirm: () => {
+                                this._waitingForStockCodeScan = true;
+                                this.startScanning();
+                            }
+                        });
+                        return;
+                    }
+                    
+                    // Process the stock code
+                    this.finishUnknownStockScan(stockCode);
+                    return;
+                }
+                
                 const parsed = this.parseQRCode(cleanedCode);
                 
                 if (!parsed.valid) {
@@ -2078,9 +2104,19 @@
                     // Store data for after scan
                     this._unknownStockParsed = parsed;
                     this._unknownStockScanKey = scanKey;
+                    this._waitingForStockCodeScan = true;
                     
-                    // Go straight into scanning mode
-                    this.scanUnknownStockCode();
+                    // Show message and let user scan stock code with normal scanner
+                    this.showModal({
+                        title: '📦 Unknown Product',
+                        message: `The scanned barcode is not in the database.\n\nOriginal scan:\n${parsed.raw}\n\nPlease scan the STOCK CODE barcode on this product.`,
+                        type: 'alert',
+                        confirmText: 'Scan Stock Code',
+                        onConfirm: () => {
+                            // Start normal scanner - it will be handled specially
+                            this.startScanning();
+                        }
+                    });
                     return;
                 }
                 
