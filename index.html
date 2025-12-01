@@ -111,12 +111,8 @@
         // ===========================================
         // DATABASE CONFIGURATION
         // ===========================================
-        // Detect hosting environment
-        const isNetlify = window.location.hostname.includes('netlify.app') || window.location.hostname.includes('netlify.com');
-        const isGitHubPages = window.location.hostname.includes('github.io');
         
-        // Supabase Configuration (for GitHub Pages)
-        // TODO: Replace these with your Supabase project credentials
+        // Supabase Configuration
         const SUPABASE_URL = 'https://exltxjvzsefmaxlgxyio.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4bHR4anZ6c2VmbWF4bGd4eWlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0NTQ2MjcsImV4cCI6MjA4MDAzMDYyN30.kc5RFVrN5orQ7AqPd51ot-sK1xbWsy_58ToowCvYhZw';
         const HEARTBEAT_INTERVAL_MS = 15000;
@@ -158,36 +154,15 @@
             }
         }
 
-        // Database helper - uses Netlify Functions OR Supabase OR localStorage
+        // Database helper - uses Supabase or localStorage fallback
         const db = {
             connected: false,
-            mode: 'localStorage', // 'netlify', 'supabase', or 'localStorage'
+            mode: 'localStorage', // 'supabase' or 'localStorage'
             
             async init() {
-                // Try Netlify Functions first (if on Netlify)
-                if (isNetlify) {
-                    try {
-                        const response = await fetch('/.netlify/functions/db', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ action: 'init' })
-                        });
-                        if (response.ok) {
-                            this.connected = true;
-                            this.mode = 'netlify';
-                            console.log('Connected to Neon DB via Netlify Functions');
-                            return true;
-                        }
-                    } catch (err) {
-                        console.log('Netlify Functions not available:', err.message);
-                    }
-                }
-                
-                // Try Supabase (if on GitHub Pages and configured)
+                // Try Supabase
                 if (supabase) {
                     try {
-                        // Create tables if they don't exist (Supabase handles this via migrations)
-                        // Just test the connection
                         const { error } = await supabase.from('stock_scans').select('id').limit(1);
                         if (!error || error.code === 'PGRST116') { // Table might be empty
                             this.connected = true;
@@ -209,14 +184,6 @@
             },
 
             async insertStockTake(date) {
-                if (this.mode === 'netlify') {
-                    const response = await fetch('/.netlify/functions/db', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'insertStockTake', date })
-                    });
-                    return response.ok;
-                }
                 if (this.mode === 'supabase') {
                     const { error } = await supabase.from('stock_takes').upsert({ 
                         take_date: date, 
@@ -228,18 +195,6 @@
             },
             
             async getStockScans(date) {
-                if (this.mode === 'netlify') {
-                    const response = await fetch('/.netlify/functions/db', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'getStockScans', date })
-                    });
-                    if (response.ok) {
-                        const data = await response.json();
-                        return data.rows || [];
-                    }
-                    return [];
-                }
                 if (this.mode === 'supabase') {
                     const { data, error } = await supabase
                         .from('stock_scans')
@@ -252,14 +207,6 @@
             },
             
             async insertStockScan(scan) {
-                if (this.mode === 'netlify') {
-                    const response = await fetch('/.netlify/functions/db', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'insertStockScan', scan })
-                    });
-                    return response.ok;
-                }
                 if (this.mode === 'supabase') {
                     const { error } = await supabase.from('stock_scans').insert({
                         take_date: scan.take_date,
@@ -279,18 +226,6 @@
             },
             
             async checkDuplicate(date, batchNumber, palletNumber) {
-                if (this.mode === 'netlify') {
-                    const response = await fetch('/.netlify/functions/db', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'checkDuplicate', date, batchNumber, palletNumber })
-                    });
-                    if (response.ok) {
-                        const data = await response.json();
-                        return data.duplicate || null;
-                    }
-                    return null;
-                }
                 if (this.mode === 'supabase') {
                     const { data, error } = await supabase
                         .from('stock_scans')
@@ -306,14 +241,6 @@
             },
             
             async deleteStockScan(id) {
-                if (this.mode === 'netlify') {
-                    const response = await fetch('/.netlify/functions/db', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'deleteStockScan', id })
-                    });
-                    return response.ok;
-                }
                 if (this.mode === 'supabase') {
                     const { error } = await supabase.from('stock_scans').delete().eq('id', id);
                     return !error;
@@ -1238,10 +1165,6 @@
                 this.init();
             }
 
-            get useNeonDB() {
-                return db.mode === 'netlify';
-            }
-
             get usingSupabaseDB() {
                 return db.mode === 'supabase';
             }
@@ -1342,9 +1265,6 @@
                 // Check if there's an active stock take for today
                 if (this.activeStockTake && this.activeStockTake.date === this.currentTakeDate) {
                     // Continue with existing stock take
-                    if (this.useNeonDB) {
-                        await this.ensureStockTake();
-                    }
                     this.startAutoSync();
                     await this.loadScans();
                     if (supabaseSessionsEnabled) {
@@ -1362,7 +1282,7 @@
                 if (!this.isBrowserOnline) {
                     return true;
                 }
-                return !this.useNeonDB && !(supabaseSessionsEnabled && this.activeStockTake?.id);
+                return !(supabaseSessionsEnabled && this.activeStockTake?.id);
             }
 
             async handleConnectivityChange(isOnline) {
@@ -1444,16 +1364,11 @@
                 
                 setActiveStockTake(this.activeStockTake);
                 this.scans = [];
-                if (!this.useNeonDB) {
-                    clearLocalScanStorage();
-                }
+                clearLocalScanStorage();
                 
                 this.showingStartStockTake = false;
                 this.selectedStockTakeType = null;
                 
-                if (this.useNeonDB) {
-                    await this.ensureStockTake();
-                }
                 this.startAutoSync();
                 if (supabaseSessionsEnabled) {
                     this.startHeartbeat('active');
@@ -1501,9 +1416,6 @@
                 this.showingStartStockTake = false;
                 this.selectedStockTakeType = null;
                 
-                if (this.useNeonDB) {
-                    await this.ensureStockTake();
-                }
                 this.startAutoSync();
                 if (supabaseSessionsEnabled) {
                     this.startHeartbeat('active');
@@ -2487,7 +2399,7 @@
                         site: locationPayload.site,
                         aisle: locationPayload.aisle,
                         rack: locationPayload.rack,
-                        unit_type: parsedData.unitType || (sessionType === 'RM' ? 'kg' : 'cases')
+                        unit_type: parsedData.unitType || (sessionType === 'RM' ? getUnitTypeForStockCode(parsedData.stockCode) : 'cases')
                     });
                     if (!result) {
                         await logClientEvent('scan-insert-failed', 'error', sessionId, { transport: 'netlify', batch: parsedData.batchNumber });
