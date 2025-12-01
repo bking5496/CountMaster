@@ -465,10 +465,12 @@
                         const productType = item.type || 'Non-Ingredient';
                         const description = item.description || '';
                         if (stockCode) {
+                            // Check if type is "ingredient" or "ingredients" (case-insensitive)
+                            const isIngredient = productType.toLowerCase().startsWith('ingredient');
                             productTypeDatabase[stockCode] = {
                                 productType: productType,
                                 description: description,
-                                unitType: productType.toLowerCase() === 'ingredient' ? 'kg' : 'units'
+                                unitType: isIngredient ? 'kg' : 'units'
                             };
                         }
                     });
@@ -533,24 +535,18 @@
             }
         }
         
-        // Get unit type for a stock code (kg for RM/Ingredient, units for PM/Non-Ingredient)
+        // Get unit type for a stock code from product_types table
+        // If type is "ingredients" -> KG, otherwise -> UN (units)
         function getUnitTypeForStockCode(stockCode) {
             if (!stockCode) return 'units';
             const upperCode = stockCode.toUpperCase();
             
-            // Check product type database first
+            // Check product_types database (loaded from Supabase)
             if (productTypeDatabase[upperCode]) {
-                return productTypeDatabase[upperCode].unitType;
+                return productTypeDatabase[upperCode].unitType; // 'kg' or 'units'
             }
             
-            // Default logic based on prefix
-            if (upperCode.startsWith('RM')) {
-                return 'kg'; // Raw Materials are measured in kg
-            } else if (upperCode.startsWith('PM')) {
-                return 'units'; // PM products are counted in units
-            }
-            
-            // Default to units for unknown
+            // Default to units for unknown stock codes
             return 'units';
         }
         
