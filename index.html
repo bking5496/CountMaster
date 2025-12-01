@@ -1658,6 +1658,7 @@
                 const sessionType = this.activeStockTake?.sessionType || 'FP';
                 
                 // FP (Finished Products) - 13 digit numeric code
+                // Format: BBBBBPPPPCCCC (5 batch + 4 pallet + 4 cases)
                 if (sessionType === 'FP') {
                     if (!/^\d{13}$/.test(code)) {
                         return {
@@ -1667,9 +1668,9 @@
                         };
                     }
 
-                    const batchNumber = code.substring(0, 5);
-                    const palletNumber = code.substring(7, 9);
-                    const cases = code.substring(10, 13);
+                    const batchNumber = code.substring(0, 5);    // First 5 digits = batch
+                    const palletNumber = code.substring(5, 9);   // Next 4 digits = pallet
+                    const cases = code.substring(9, 13);         // Last 4 digits = cases
 
                     const productInfo = productDatabase[batchNumber] || {
                         stockCode: 'UNKNOWN',
@@ -1994,22 +1995,54 @@
                     const timestamp = duplicate.scanned_at || duplicate.created_at || duplicate.date + ' ' + duplicate.time;
                     const scannedByName = duplicate.scanned_by || duplicate.scannedBy || 'Unknown';
                     const deviceInfo = duplicate.device_id || duplicate.deviceId || '';
+                    const existingCases = duplicate.actual_cases || duplicate.actualCases || 0;
                     
                     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                     
                     const sessionType = this.activeStockTake?.sessionType || 'FP';
-                    const itemLabel = sessionType === 'RM' ? 'item' : 'pallet';
                     
+                    // For FP, pallet cannot be scanned twice - must update
+                    if (sessionType === 'FP') {
+                        // Store duplicate info for update flow
+                        parsed.isDuplicatePallet = true;
+                        parsed.existingScanId = duplicate.id;
+                        parsed.existingCases = existingCases;
+                        
+                        // Show modal to notify and confirm update
+                        this.showModal({
+                            title: '⚠️ Pallet Already Scanned',
+                            message: `This pallet has already been scanned!\n\n` +
+                                `Stock Code: ${parsed.stockCode}\n` +
+                                `Batch: ${parsed.batchNumber}\n` +
+                                `Pallet: ${parsed.palletNumber}\n` +
+                                `Current Cases: ${existingCases}\n\n` +
+                                `Scanned by: ${scannedByName}\n` +
+                                `at ${new Date(timestamp).toLocaleString()}\n\n` +
+                                `Would you like to update this pallet's count?`,
+                            type: 'confirm',
+                            confirmText: 'Update Count',
+                            cancelText: 'Cancel',
+                            onConfirm: () => {
+                                // Proceed to case entry to update
+                                this.pendingScanKeys.add(scanKey);
+                                this.currentScan = parsed;
+                                this.showingCaseEntry = true;
+                                this.render();
+                            }
+                        });
+                        return;
+                    }
+                    
+                    // For RM, keep existing behavior
                     const rescan = confirm(
                         `⚠️ DUPLICATE SCAN DETECTED!\n\n` +
                         `Stock Code: ${parsed.stockCode}\n` +
                         `Batch: ${parsed.batchNumber}\n` +
-                        (sessionType !== 'RM' ? `Pallet: ${parsed.palletNumber}\n` : '') +
                         (parsed.expiryDate ? `Expiry: ${parsed.expiryDate}\n` : '') +
                         `\nPreviously scanned by: ${scannedByName}\n` +
                         (deviceInfo ? `Device: ${deviceInfo}\n` : '') +
                         `at ${new Date(timestamp).toLocaleString()}\n\n` +
-                        `Do you want to rescan this ${itemLabel}?`
+                        `Do you want to rescan this item?`
                     );
                     
                     if (!rescan) {
@@ -2040,7 +2073,11 @@
                     aisle: null,
                     rack: null
                 };
-                console.log('Saving scan:', { parsedData, actualCases, userName, useNeonDB: this.useNeonDB, isGitHubPages: this.isGitHubPages, sessionType, sessionId, supabaseEnabled: !!supabase });
+                
+                // Check if this is an update to an existing pallet scan
+                const isUpdate = parsedData.isDuplicatePallet && parsedData.existingScanId;
+                
+                console.log('Saving scan:', { parsedData, actualCases, userName, useNeonDB: this.useNeonDB, isGitHubPages: this.isGitHubPages, sessionType, sessionId, supabaseEnabled: !!supabase, isUpdate });
                 
                 // Check if we have a valid session for Supabase saves
                 if (!this.useNeonDB && supabase && !sessionId) {
@@ -2074,48 +2111,83 @@
                     }
                     console.log('Insert result:', result);
                 } else if (supabase && sessionId) {
-                    // Save ALL scans to stock_scans table
-                    console.log('Saving to Supabase with sessionId:', sessionId);
-                    try {
-                        const record = {
-                            session_id: sessionId,
-                            take_date: this.currentTakeDate,
-                            batch_number: parsedData.batchNumber,
-                            stock_code: parsedData.stockCode,
-                            description: parsedData.description,
-                            scanned_by: userName,
-                            device_id: DEVICE_ID,
-                            session_type: sessionType,
-                            location: locationPayload.location,
-                            site: locationPayload.site,
-                            aisle: locationPayload.aisle,
-                            rack: locationPayload.rack,
-                            unit_type: parsedData.unitType || (sessionType === 'RM' ? 'kg' : 'cases'),
-                            actual_cases: actualCases,
-                            pallet_number: parsedData.palletNumber || null,
-                            cases_on_pallet: parsedData.casesOnPallet || null,
-                            expiry_date: parsedData.expiryDate || null,
-                            raw_code: parsedData.raw
-                        };
-                        
-                        const { data, error } = await supabase
-                            .from('stock_scans')
-                            .insert([record])
-                            .select();
-                        
-                        if (error) {
-                            console.error('Supabase insert error:', error);
-                            await logClientEvent('scan-insert-failed', 'error', sessionId, { error: error.message, record });
-                            throw error;
+                    // Handle UPDATE for duplicate pallet
+                    if (isUpdate) {
+                        console.log('Updating existing pallet scan:', parsedData.existingScanId);
+                        try {
+                            const { data, error } = await supabase
+                                .from('stock_scans')
+                                .update({
+                                    actual_cases: actualCases,
+                                    scanned_by: userName,
+                                    device_id: DEVICE_ID,
+                                    scanned_at: new Date().toISOString(),
+                                    location: locationPayload.location,
+                                    site: locationPayload.site,
+                                    aisle: locationPayload.aisle,
+                                    rack: locationPayload.rack
+                                })
+                                .eq('id', parsedData.existingScanId)
+                                .select();
+                            
+                            if (error) {
+                                console.error('Supabase update error:', error);
+                                await logClientEvent('scan-update-failed', 'error', sessionId, { error: error.message, scanId: parsedData.existingScanId });
+                                throw error;
+                            }
+                            
+                            console.log('Updated pallet scan in Supabase:', data);
+                            await logClientEvent('scan-update', 'info', sessionId, { scanId: parsedData.existingScanId, newCases: actualCases });
+                        } catch (err) {
+                            console.error('Failed to update scan in Supabase:', err);
+                            await logClientEvent('scan-update-failed', 'error', sessionId, { message: err.message });
+                            alert('Failed to update scan. Please check your connection.');
+                            throw err;
                         }
+                    } else {
+                        // INSERT new scan
+                        console.log('Saving to Supabase with sessionId:', sessionId);
+                        try {
+                            const record = {
+                                session_id: sessionId,
+                                take_date: this.currentTakeDate,
+                                batch_number: parsedData.batchNumber,
+                                stock_code: parsedData.stockCode,
+                                description: parsedData.description,
+                                scanned_by: userName,
+                                device_id: DEVICE_ID,
+                                session_type: sessionType,
+                                location: locationPayload.location,
+                                site: locationPayload.site,
+                                aisle: locationPayload.aisle,
+                                rack: locationPayload.rack,
+                                unit_type: parsedData.unitType || (sessionType === 'RM' ? 'kg' : 'cases'),
+                                actual_cases: actualCases,
+                                pallet_number: parsedData.palletNumber || null,
+                                cases_on_pallet: parsedData.casesOnPallet || null,
+                                expiry_date: parsedData.expiryDate || null,
+                                raw_code: parsedData.raw
+                            };
+                            
+                            const { data, error } = await supabase
+                                .from('stock_scans')
+                                .insert([record])
+                                .select();
                         
-                        console.log('Saved to Supabase stock_scans:', data);
-                        await logClientEvent('scan-insert', 'info', sessionId, { scanId: data?.[0]?.id || null });
-                    } catch (err) {
-                        console.error('Failed to save to Supabase:', err);
-                        await logClientEvent('scan-insert-failed', 'error', sessionId, { message: err.message });
-                        alert('Failed to save scan to database. Please check your connection.');
-                        throw err;
+                            if (error) {
+                                console.error('Supabase insert error:', error);
+                                await logClientEvent('scan-insert-failed', 'error', sessionId, { error: error.message, record });
+                                throw error;
+                            }
+                        
+                            console.log('Saved to Supabase stock_scans:', data);
+                            await logClientEvent('scan-insert', 'info', sessionId, { scanId: data?.[0]?.id || null });
+                        } catch (err) {
+                            console.error('Failed to save to Supabase:', err);
+                            await logClientEvent('scan-insert-failed', 'error', sessionId, { message: err.message });
+                            alert('Failed to save scan to database. Please check your connection.');
+                            throw err;
+                        }
                     }
                 } else {
                     // Fallback to localStorage (offline mode)
@@ -2392,17 +2464,83 @@
 
             manualEntry() {
                 this.stopScanning();
-                this.showModal({
-                    title: 'Manual Entry',
-                    message: 'Enter the QR code manually:',
-                    type: 'input',
-                    confirmText: 'Process',
-                    onConfirm: (data) => {
-                        if (data.value && data.value.trim()) {
-                            this.onScanSuccess(data.value.trim());
+                const sessionType = this.activeStockTake?.sessionType || 'FP';
+                
+                if (sessionType === 'FP') {
+                    // FP: Allow entering 5-digit batch code to lookup product
+                    this.showModal({
+                        title: 'Enter Batch Code',
+                        message: 'Enter the 5-digit batch number:',
+                        type: 'input',
+                        confirmText: 'Lookup',
+                        onConfirm: (data) => {
+                            const batchCode = (data.value || '').trim();
+                            if (!batchCode) return;
+                            
+                            // Validate it's 5 digits
+                            if (!/^\d{5}$/.test(batchCode)) {
+                                alert('Please enter exactly 5 digits for the batch code');
+                                return;
+                            }
+                            
+                            // Lookup product in database
+                            const productInfo = productDatabase[batchCode];
+                            if (!productInfo || productInfo.stockCode === 'UNKNOWN') {
+                                alert(`Product not found for batch code: ${batchCode}\n\nPlease check the code or add it to the product database.`);
+                                return;
+                            }
+                            
+                            // Product found - now ask for number of cases
+                            this.showModal({
+                                title: 'Enter Case Count',
+                                message: `Product: ${productInfo.stockCode}\n${productInfo.description}\n\nEnter number of cases:`,
+                                type: 'input',
+                                confirmText: 'Confirm',
+                                onConfirm: (caseData) => {
+                                    const cases = parseInt(caseData.value, 10);
+                                    if (isNaN(cases) || cases < 0) {
+                                        alert('Please enter a valid number of cases');
+                                        return;
+                                    }
+                                    
+                                    // Create a manual entry scan object
+                                    const manualScan = {
+                                        valid: true,
+                                        raw: `MANUAL:${batchCode}`,
+                                        batchNumber: batchCode,
+                                        palletNumber: 'MANUAL',
+                                        casesOnPallet: cases,
+                                        stockCode: productInfo.stockCode,
+                                        description: productInfo.description,
+                                        isManualEntry: true
+                                    };
+                                    
+                                    // Save the scan directly
+                                    this.saveScan(manualScan, cases).then(() => {
+                                        // Show success feedback
+                                        if (navigator.vibrate) navigator.vibrate(200);
+                                    }).catch(err => {
+                                        console.error('Failed to save manual entry:', err);
+                                        alert('Failed to save. Please try again.');
+                                    });
+                                }
+                            });
                         }
-                    }
-                });
+                    });
+                } else {
+                    // RM: Keep existing behavior - enter full code
+                    this.showModal({
+                        title: 'Manual Entry',
+                        message: 'Enter the QR code manually:',
+                        type: 'input',
+                        confirmText: 'Process',
+                        onConfirm: (data) => {
+                            if (data.value && data.value.trim()) {
+                                this.onScanSuccess(data.value.trim());
+                            }
+                        }
+                    });
+                }
             }
 
             showProductDatabase() {
@@ -3203,7 +3341,20 @@
                                     </div>
                                     
                                     <div class="w-full space-y-5">
-                                        <input type="hidden" id="userNameInput" value="${savedName}" />
+                                        <!-- Name Input Field -->
+                                        <div>
+                                            <label class="block text-sm font-bold text-slate-700 mb-2 text-center">
+                                                Your Name
+                                            </label>
+                                            <input 
+                                                type="text" 
+                                                id="userNameInput" 
+                                                value="${savedName}"
+                                                placeholder="Enter your name"
+                                                onchange="setUserName(this.value)"
+                                                class="w-full px-4 py-3 text-center text-lg font-medium border-2 border-slate-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                                            />
+                                        </div>
                                         
                                         <div>
                                             <label class="block text-sm font-bold text-slate-700 mb-3 text-center">
@@ -4218,7 +4369,7 @@
                 // Main screen
                 const userName = getUserName();
                 updateView(`
-                    <div class="min-h-screen bg-slate-50 pb-32">
+                    <div class="min-h-screen bg-slate-50 pb-24">
                         <!-- Sticky Header -->
                         <div class="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3 shadow-sm">
                             <div class="max-w-4xl mx-auto flex items-center justify-between">
@@ -4292,24 +4443,6 @@
                                     <div>
                                         <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Total Scanned</div>
                                         <div class="text-3xl sm:text-4xl font-black text-slate-900">${this.scans.length}</div>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        ${this.scans.length > 0 ? `
-                                            <button onclick="app.exportStockCount()" class="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-4 py-2 rounded-xl text-sm font-bold transition-colors flex items-center gap-2">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                                                </svg>
-                                                Export
-                                            </button>
-                                        ` : ''}
-                                        ${this.activeStockTake ? `
-                                            <button onclick="app.toggleSessionPause()" class="${this.activeStockTake.status === 'paused' ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'} px-4 py-2 rounded-xl text-sm font-bold transition-colors">
-                                                ${this.activeStockTake.status === 'paused' ? 'Resume' : 'Pause'}
-                                            </button>
-                                        ` : ''}
-                                        <button onclick="app.endStockTake()" class="bg-slate-50 text-slate-600 hover:bg-slate-100 px-4 py-2 rounded-xl text-sm font-bold transition-colors">
-                                            I'm Done
-                                        </button>
                                     </div>
                                 </div>
                                 ${(() => {
@@ -4461,15 +4594,12 @@
                             </div>
                         </div>
 
-                        <!-- Floating Action Button -->
-                        <div class="fixed bottom-6 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:max-w-2xl z-40">
-                            <button onclick="app.startScanning()" class="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white py-4 rounded-2xl text-base sm:text-lg font-bold shadow-xl shadow-blue-200 transition-all flex items-center justify-center gap-3">
-                                <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
-                                </svg>
-                                <span>Scan New Item</span>
-                            </button>
-                        </div>
+                        <!-- Floating Scan Button - Bottom Right -->
+                        <button onclick="app.startScanning()" class="fixed bottom-6 right-6 w-16 h-16 ${this.activeStockTake?.sessionType === 'RM' ? 'bg-teal-600 hover:bg-teal-700 shadow-teal-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'} active:scale-95 text-white rounded-full shadow-xl z-40 flex items-center justify-center transition-all">
+                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+                            </svg>
+                        </button>
                     </div>
                 `);
             }
