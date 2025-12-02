@@ -760,9 +760,9 @@
         const getUserName = () => localStorage.getItem('userName') || '';
         const setUserName = (name) => localStorage.setItem('userName', name);
         
-        // Warehouse location for supervisors (PSA or PML)
-        const getSupervisorWarehouse = () => localStorage.getItem('supervisorWarehouse') || '';
-        const setSupervisorWarehouse = (warehouse) => localStorage.setItem('supervisorWarehouse', warehouse);
+        // Warehouse location for all users (PSA or PML)
+        const getUserWarehouse = () => localStorage.getItem('userWarehouse') || '';
+        const setUserWarehouse = (warehouse) => localStorage.setItem('userWarehouse', warehouse);
         
         // Role detection based on name suffix (temporary for testing)
         // *** = admin (full access)
@@ -799,9 +799,13 @@
             return getUserRole() === 'admin';
         };
         
-        // Check if supervisor needs to select warehouse
-        const supervisorNeedsWarehouse = () => {
-            return getUserRole() === 'supervisor' && !getSupervisorWarehouse();
+        // Check if user needs to select warehouse
+        const userNeedsWarehouse = () => {
+            const role = getUserRole();
+            // Admins don't need warehouse (they see everything)
+            if (role === 'admin') return false;
+            // Supervisors and operators need warehouse
+            return !getUserWarehouse();
         };
         
         // Get/set active stock take
@@ -1561,27 +1565,31 @@
             handleNameChange() {
                 const role = getUserRole();
                 
-                // If user just became a supervisor, prompt for warehouse location
-                if (role === 'supervisor' && !getSupervisorWarehouse()) {
+                // Admins don't need warehouse selection
+                if (role === 'admin') {
+                    localStorage.removeItem('userWarehouse');
+                    this.render();
+                    return;
+                }
+                
+                // Prompt all non-admin users for warehouse location if not set
+                if (!getUserWarehouse()) {
+                    const roleLabel = role === 'supervisor' ? 'supervisor' : 'operator';
                     this.showModal({
                         title: '📍 Select Your Warehouse',
-                        message: 'As a supervisor, please confirm your warehouse location:',
+                        message: `As ${role === 'supervisor' ? 'a supervisor' : 'an operator'}, please confirm your warehouse location:`,
                         type: 'confirm',
                         confirmText: 'PSA',
                         cancelText: 'PML',
                         onConfirm: () => {
-                            setSupervisorWarehouse('PSA');
+                            setUserWarehouse('PSA');
                             this.render();
                         },
                         onCancel: () => {
-                            setSupervisorWarehouse('PML');
+                            setUserWarehouse('PML');
                             this.render();
                         }
                     });
-                } else if (role !== 'supervisor') {
-                    // Clear warehouse if no longer a supervisor
-                    localStorage.removeItem('supervisorWarehouse');
-                    this.render();
                 } else {
                     this.render();
                 }
@@ -1593,6 +1601,30 @@
                     return;
                 }
                 setUserName(userName.trim());
+                
+                // Check if user needs to select warehouse (non-admins)
+                const role = getUserRole();
+                if (role !== 'admin' && !getUserWarehouse()) {
+                    this.showModal({
+                        title: '📍 Select Your Warehouse',
+                        message: `Please confirm your warehouse location:`,
+                        type: 'confirm',
+                        confirmText: 'PSA',
+                        cancelText: 'PML',
+                        onConfirm: () => {
+                            setUserWarehouse('PSA');
+                            this.selectedStockTakeType = type;
+                            this.render();
+                        },
+                        onCancel: () => {
+                            setUserWarehouse('PML');
+                            this.selectedStockTakeType = type;
+                            this.render();
+                        }
+                    });
+                    return;
+                }
+                
                 this.selectedStockTakeType = type;
                 this.render();
             }
@@ -1621,8 +1653,8 @@
                     lastSeen: new Date().toISOString()
                 };
                 
-                // Get warehouse for supervisor
-                const warehouse = getSupervisorWarehouse() || '';
+                // Get warehouse for session
+                const warehouse = getUserWarehouse() || '';
                 
                 this.activeStockTake = {
                     id: sessionId,
@@ -3333,7 +3365,7 @@
                 // Now load all sessions from localStorage
                 const role = getUserRole();
                 const displayName = getDisplayName();
-                const supervisorWarehouse = getSupervisorWarehouse();
+                const userWarehouse = getUserWarehouse();
                 
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
@@ -3341,15 +3373,12 @@
                         try {
                             const session = JSON.parse(localStorage.getItem(key));
                             if (session && session.id && !seenSessionIds.has(session.id)) {
-                                // For supervisors, show sessions from their warehouse
-                                if (role === 'supervisor') {
-                                    const sessionCreator = (session.startedBy || session.userName || '').replace(/\*+$/, '').trim();
+                                // Filter by warehouse for non-admin users
+                                if (role !== 'admin') {
                                     const sessionWarehouse = session.warehouse || '';
-                                    const isOwnSession = sessionCreator.toLowerCase() === displayName.toLowerCase();
-                                    const isSameWarehouse = sessionWarehouse && sessionWarehouse === supervisorWarehouse;
-                                    
-                                    if (!isOwnSession && !isSameWarehouse) {
-                                        continue; // Skip sessions not from this supervisor's warehouse
+                                    // Only show sessions from same warehouse
+                                    if (sessionWarehouse && sessionWarehouse !== userWarehouse) {
+                                        continue; // Skip sessions from different warehouse
                                     }
                                 }
                                 
@@ -3386,24 +3415,18 @@
                         
                         if (!stockTakesError && stockTakesData) {
                             const role = getUserRole();
-                            const displayName = getDisplayName();
-                            const supervisorWarehouse = getSupervisorWarehouse();
+                            const userWarehouse = getUserWarehouse();
                             
                             stockTakesData.forEach(session => {
                                 if (session.id && !seenSessionIds.has(session.id)) {
-                                    // For supervisors, show sessions from their warehouse
-                                    if (role === 'supervisor') {
+                                    // Filter by warehouse for non-admin users
+                                    if (role !== 'admin') {
                                         const sessionWarehouse = session.metadata?.warehouse || '';
-                                        // Show sessions from the same warehouse OR sessions they created
-                                        const sessionCreator = (session.started_by || '').replace(/\*+$/, '').trim();
-                                        const isOwnSession = sessionCreator.toLowerCase() === displayName.toLowerCase();
-                                        const isSameWarehouse = sessionWarehouse && sessionWarehouse === supervisorWarehouse;
-                                        
-                                        if (!isOwnSession && !isSameWarehouse) {
-                                            return; // Skip sessions not from this supervisor's warehouse
+                                        // Only show sessions from same warehouse
+                                        if (sessionWarehouse && sessionWarehouse !== userWarehouse) {
+                                            return; // Skip sessions from different warehouse
                                         }
                                     }
-                                    // Admins see all, operators shouldn't reach here (canViewHistory check)
                                     
                                     const isActive = activeSessionIds.has(session.id);
                                     const startTime = session.started_at 
@@ -3433,7 +3456,7 @@
                         
                         if (!error && data) {
                             const role = getUserRole();
-                            const displayName = getDisplayName();
+                            const userWarehouse = getUserWarehouse();
                             
                             // Group by session_id to get unique sessions
                             const sessionMap = new Map();
@@ -3456,15 +3479,8 @@
                                 }
                             });
                             
-                            // Filter and add Supabase sessions to the list
+                            // Add sessions to list (stock_scans don't have warehouse info, so include all for fallback)
                             sessionMap.forEach(session => {
-                                // For supervisors, only show sessions they may have created
-                                if (role === 'supervisor') {
-                                    const sessionCreator = (session.startedBy || '').replace(/\*+$/, '').trim();
-                                    if (sessionCreator.toLowerCase() !== displayName.toLowerCase()) {
-                                        return; // Skip
-                                    }
-                                }
                                 allSessions.push(session);
                             });
                         }
@@ -5597,14 +5613,15 @@
                                             />
                                             ${(() => {
                                                 const role = getUserRole();
-                                                const warehouse = getSupervisorWarehouse();
+                                                const warehouse = getUserWarehouse();
                                                 if (role === 'admin') {
                                                     return '<div class="mt-2 text-center"><span class="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">👑 Admin</span></div>';
                                                 } else if (role === 'supervisor') {
                                                     const warehouseBadge = warehouse ? ` • ${warehouse}` : '';
                                                     return '<div class="mt-2 text-center"><span class="inline-flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold">⭐ Supervisor' + warehouseBadge + '</span></div>';
                                                 } else {
-                                                    return '<div class="mt-2 text-center"><span class="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold">👤 Operator</span></div>';
+                                                    const warehouseBadge = warehouse ? ` • ${warehouse}` : '';
+                                                    return '<div class="mt-2 text-center"><span class="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-bold">👤 Operator' + warehouseBadge + '</span></div>';
                                                 }
                                             })()}
                                         </div>
