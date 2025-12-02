@@ -761,15 +761,35 @@
         const setUserName = (name) => localStorage.setItem('userName', name);
         
         // Warehouse location for all users (PSA or PML)
-        const getUserWarehouse = () => localStorage.getItem('userWarehouse') || '';
+        // Checks localStorage first, then Supabase cache
+        const getUserWarehouse = () => {
+            const localWarehouse = localStorage.getItem('userWarehouse');
+            if (localWarehouse) return localWarehouse;
+            
+            // Check Supabase cached user data
+            const name = getUserName();
+            if (cachedUserData && cachedUserData.name?.toLowerCase() === name?.toLowerCase()) {
+                return cachedUserData.warehouse || '';
+            }
+            
+            return '';
+        };
         const setUserWarehouse = (warehouse) => localStorage.setItem('userWarehouse', warehouse);
         
         // Role detection based on name suffix (temporary for testing)
         // *** = admin (full access)
         // * = supervisor (can create sessions, see own session history)
         // no suffix = operator (basic scanning only)
+        // Now also checks Supabase cached data if available
         const getUserRole = () => {
             const name = getUserName();
+            
+            // Check cached Supabase user data first
+            if (cachedUserData && cachedUserData.name?.toLowerCase() === name?.toLowerCase()) {
+                return cachedUserData.role || 'operator';
+            }
+            
+            // Fallback to name suffix detection
             if (name.endsWith('***')) return 'admin';
             if (name.endsWith('*')) return 'supervisor';
             return 'operator';
@@ -777,7 +797,13 @@
         
         const getDisplayName = () => {
             const name = getUserName();
-            // Remove role suffixes for display
+            
+            // Use Supabase display name if available
+            if (cachedUserData && cachedUserData.name?.toLowerCase() === name?.toLowerCase()) {
+                return cachedUserData.display_name || name;
+            }
+            
+            // Fallback: Remove role suffixes for display
             return name.replace(/\*+$/, '').trim();
         };
         
@@ -806,6 +832,172 @@
             if (role === 'admin') return false;
             // Supervisors and operators need warehouse
             return !getUserWarehouse();
+        };
+        
+        // ===========================================
+        // SUPABASE USER & DEVICE SYNC
+        // ===========================================
+        
+        // Cache for user data from Supabase
+        let cachedUserData = null;
+        let userDataLastFetched = null;
+        const USER_CACHE_TTL_MS = 60000; // 1 minute cache
+        
+        // Sync current user to Supabase
+        const syncUserToSupabase = async (name, role, warehouse) => {
+            if (!supabase || db.mode !== 'supabase') return null;
+            
+            try {
+                const displayName = name.replace(/\*+$/, '').trim();
+                const { data, error } = await supabase.rpc('upsert_app_user', {
+                    p_name: name,
+                    p_display_name: displayName,
+                    p_role: role,
+                    p_warehouse: warehouse || null
+                });
+                
+                if (error) {
+                    console.warn('Failed to sync user to Supabase:', error);
+                    return null;
+                }
+                
+                // Update cache
+                cachedUserData = data;
+                userDataLastFetched = Date.now();
+                
+                return data;
+            } catch (err) {
+                console.error('Error syncing user:', err);
+                return null;
+            }
+        };
+        
+        // Sync current device to Supabase
+        const syncDeviceToSupabase = async () => {
+            if (!supabase || db.mode !== 'supabase') return null;
+            
+            try {
+                const userName = getUserName();
+                const platform = detectPlatform();
+                const userAgent = navigator.userAgent;
+                
+                const { data, error } = await supabase.rpc('upsert_app_device', {
+                    p_device_id: DEVICE_ID,
+                    p_user_name: userName || null,
+                    p_platform: platform,
+                    p_user_agent: userAgent,
+                    p_metadata: { screenWidth: window.innerWidth, screenHeight: window.innerHeight }
+                });
+                
+                if (error) {
+                    console.warn('Failed to sync device to Supabase:', error);
+                    return null;
+                }
+                
+                return data;
+            } catch (err) {
+                console.error('Error syncing device:', err);
+                return null;
+            }
+        };
+        
+        // Detect platform from user agent
+        const detectPlatform = () => {
+            const ua = navigator.userAgent;
+            if (/iPad|iPhone|iPod/.test(ua)) return 'iOS';
+            if (/Android/.test(ua)) return 'Android';
+            if (/Windows/.test(ua)) return 'Windows';
+            if (/Mac/.test(ua)) return 'macOS';
+            if (/Linux/.test(ua)) return 'Linux';
+            return 'Unknown';
+        };
+        
+        // Get user data from Supabase (with caching)
+        const getUserFromSupabase = async (name) => {
+            if (!supabase || db.mode !== 'supabase') return null;
+            
+            // Check cache
+            if (cachedUserData && userDataLastFetched && 
+                (Date.now() - userDataLastFetched) < USER_CACHE_TTL_MS &&
+                cachedUserData.name?.toLowerCase() === name?.toLowerCase()) {
+                return cachedUserData;
+            }
+            
+            try {
+                const { data, error } = await supabase.rpc('get_user_by_name', { p_name: name });
+                
+                if (error) {
+                    console.warn('Failed to get user from Supabase:', error);
+                    return null;
+                }
+                
+                // Update cache
+                cachedUserData = data;
+                userDataLastFetched = Date.now();
+                
+                return data;
+            } catch (err) {
+                console.error('Error getting user:', err);
+                return null;
+            }
+        };
+        
+        // Get user role from Supabase (fallback to name suffix)
+        const getUserRoleFromSupabase = async (name) => {
+            if (!name) return 'operator';
+            
+            // Try Supabase first
+            const userData = await getUserFromSupabase(name);
+            if (userData?.role) {
+                return userData.role;
+            }
+            
+            // Fallback to name suffix detection
+            if (name.endsWith('***')) return 'admin';
+            if (name.endsWith('*')) return 'supervisor';
+            return 'operator';
+        };
+        
+        // List all users from Supabase (for admin)
+        const listUsersFromSupabase = async (warehouse = null) => {
+            if (!supabase || db.mode !== 'supabase') return [];
+            
+            try {
+                const { data, error } = await supabase.rpc('list_app_users', { 
+                    p_warehouse: warehouse 
+                });
+                
+                if (error) {
+                    console.warn('Failed to list users from Supabase:', error);
+                    return [];
+                }
+                
+                return data || [];
+            } catch (err) {
+                console.error('Error listing users:', err);
+                return [];
+            }
+        };
+        
+        // List all devices from Supabase (for admin)
+        const listDevicesFromSupabase = async (activeOnly = true) => {
+            if (!supabase || db.mode !== 'supabase') return [];
+            
+            try {
+                const { data, error } = await supabase.rpc('list_app_devices', { 
+                    p_active_only: activeOnly 
+                });
+                
+                if (error) {
+                    console.warn('Failed to list devices from Supabase:', error);
+                    return [];
+                }
+                
+                return data || [];
+            } catch (err) {
+                console.error('Error listing devices:', err);
+                return [];
+            }
         };
         
         // Get/set active stock take
@@ -1536,6 +1728,15 @@
                 
                 await Promise.all(initPromises);
                 
+                // Sync user and device to Supabase after connection is established
+                const userName = getUserName();
+                if (userName && db.mode === 'supabase') {
+                    const role = getUserRole();
+                    const warehouse = getUserWarehouse();
+                    syncUserToSupabase(userName, role, warehouse);
+                    syncDeviceToSupabase();
+                }
+                
                 // Check if there's an active stock take for today
                 if (this.activeStockTake && this.activeStockTake.date === this.currentTakeDate) {
                     // Continue with existing stock take
@@ -1579,8 +1780,16 @@
                 this.render();
             }
 
-            handleNameChange() {
+            async handleNameChange() {
+                const name = getUserName();
                 const role = getUserRole();
+                const warehouse = getUserWarehouse();
+                
+                // Sync user and device to Supabase in background
+                if (name) {
+                    syncUserToSupabase(name, role, warehouse);
+                    syncDeviceToSupabase();
+                }
                 
                 // Admins don't need warehouse selection
                 if (role === 'admin') {
@@ -1600,10 +1809,14 @@
                         cancelText: 'PML',
                         onConfirm: () => {
                             setUserWarehouse('PSA');
+                            // Re-sync user with warehouse
+                            syncUserToSupabase(name, role, 'PSA');
                             this.render();
                         },
                         onCancel: () => {
                             setUserWarehouse('PML');
+                            // Re-sync user with warehouse
+                            syncUserToSupabase(name, role, 'PML');
                             this.render();
                         }
                     });

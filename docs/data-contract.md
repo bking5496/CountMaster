@@ -121,7 +121,42 @@ General-purpose structured log for client/server events.
 | `payload` | jsonb | Arbitrary metadata (API responses, counts, etc.). |
 | `created_at` | timestamptz | Default `now()`. |
 
-### `app_roles`
+### `app_users`
+Registered users with role and warehouse assignments.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | uuid PK | Auto-generated. |
+| `name` | text | Full username as entered (used for login matching). |
+| `display_name` | text | Name shown in UI (without role suffixes). |
+| `role` | text | Access level: `operator`, `supervisor`, `admin`. |
+| `warehouse` | text | Assigned warehouse (`PSA` or `PML`), null for admins. |
+| `email` | text | Optional email address. |
+| `is_active` | boolean | Default `true`. Set false to deactivate user. |
+| `created_at` | timestamptz | Default `now()`. |
+| `updated_at` | timestamptz | Auto-updated on changes. |
+
+Unique constraint: `lower(name)` (case-insensitive uniqueness).
+
+### `app_devices`
+Registered devices with their current/last user associations.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | uuid PK | Auto-generated. |
+| `device_id` | text UNIQUE | Client-generated identifier (e.g., `device_abc123`). |
+| `device_name` | text | Optional friendly name for the device. |
+| `user_id` | uuid FK | Current associated user (references `app_users`). |
+| `user_name` | text | Current user name (denormalized for quick access). |
+| `last_user_name` | text | Previous user name before current login. |
+| `platform` | text | Detected platform (iOS, Android, Windows, macOS, Linux). |
+| `user_agent` | text | Browser user agent string. |
+| `first_seen_at` | timestamptz | When device was first registered. |
+| `last_seen_at` | timestamptz | Updated on each sync. |
+| `is_active` | boolean | Default `true`. |
+| `metadata` | jsonb | Additional device info (screen size, etc.). |
+
+### `app_roles` (Legacy)
 Manual override for user->role mapping when JWT claim is absent.
 
 | Column | Type | Notes |
@@ -138,6 +173,47 @@ Determines the effective role:
 1. Checks `auth.jwt()->>'app_role'` claim.
 2. Falls back to `app_roles` by `auth.uid()`.
 3. Defaults to `'operator'`.
+
+### `upsert_app_user()`
+Creates or updates a user record.
+```sql
+upsert_app_user(
+    p_name text,
+    p_display_name text DEFAULT NULL,
+    p_role text DEFAULT 'operator',
+    p_warehouse text DEFAULT NULL
+) RETURNS app_users;
+```
+Behavior:
+- Finds existing user by case-insensitive name match.
+- Updates role, warehouse, display_name if user exists.
+- Creates new user if not found.
+
+### `upsert_app_device()`
+Registers or updates a device.
+```sql
+upsert_app_device(
+    p_device_id text,
+    p_user_name text DEFAULT NULL,
+    p_device_name text DEFAULT NULL,
+    p_platform text DEFAULT NULL,
+    p_user_agent text DEFAULT NULL,
+    p_metadata jsonb DEFAULT NULL
+) RETURNS app_devices;
+```
+Behavior:
+- Finds existing device by device_id.
+- Updates user association and last_seen timestamp.
+- Tracks previous user in `last_user_name`.
+
+### `get_user_by_name()`
+Returns full user record by case-insensitive name lookup.
+
+### `get_user_role()`
+Returns just the role string for a given username.
+
+### `list_app_users()` / `list_app_devices()`
+Admin functions to list all users/devices, optionally filtered.
 
 ### `validate_stock_scan()` trigger
 - Runs before insert/update on `stock_scans`.
