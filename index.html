@@ -1175,6 +1175,9 @@
                 this.showingStartStockTake = false;
                 this.showingExpirySelection = false;
                 this.showingSessionHistory = false;
+                this.showingWarehouseSetup = false;
+                this.showingLocationPicker = false;
+                this.selectedRackForPicker = null;
                 this.selectedStockTakeType = null; // 'FP' or 'RM' - selected before session
                 this.historySessions = [];
                 this.historyScans = [];
@@ -1394,20 +1397,27 @@
             // ===== END WAREHOUSE LOCATION SYSTEM =====
             
             promptForLocation() {
-                this.showModal({
-                    title: 'Set Location',
-                    message: 'Enter current location (e.g., Rack A1, Floor 1):',
-                    type: 'input',
-                    confirmText: 'Set Location',
-                    onConfirm: (data) => {
-                        this.setLocation(data.value.trim());
-                    }
-                });
-                // Pre-fill value
-                setTimeout(() => {
-                    const input = document.getElementById('modal-input');
-                    if (input) input.value = this.sessionSettings.currentLocation || '';
-                }, 50);
+                // If warehouse config exists with racks or floor locations, use the picker
+                const config = this.sessionSettings.warehouseConfig;
+                if (config && (config.racks.length > 0 || config.floorLocations.length > 0)) {
+                    this.showLocationPicker();
+                } else {
+                    // Fall back to manual text entry
+                    this.showModal({
+                        title: 'Set Location',
+                        message: 'Enter current location (e.g., Rack A1, Floor 1):',
+                        type: 'input',
+                        confirmText: 'Set Location',
+                        onConfirm: (data) => {
+                            this.setLocation(data.value.trim());
+                        }
+                    });
+                    // Pre-fill value
+                    setTimeout(() => {
+                        const input = document.getElementById('modal-input');
+                        if (input) input.value = this.sessionSettings.currentLocation || '';
+                    }, 50);
+                }
             }
 
             triggerHaptic(type = 'light') {
