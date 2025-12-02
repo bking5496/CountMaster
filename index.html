@@ -6867,16 +6867,7 @@
                                                 </span>
                                             </div>
                                             
-                                            ${scan.description.includes('Unknown') && scan.sessionType === 'RM' ? `
-                                                <div class="mb-3">
-                                                    <span class="text-orange-600 font-medium text-sm">${scan.description}</span>
-                                                    <button onclick="event.stopPropagation(); app.addScannedItemToDatabase(app.scans.find(s => s.id === '${escapedId}'))" class="ml-2 px-2 py-0.5 text-xs font-bold bg-orange-100 text-orange-600 hover:bg-orange-200 rounded-full transition-colors">
-                                                        + Add to DB
-                                                    </button>
-                                                </div>
-                                            ` : `
-                                                <div class="text-slate-900 font-medium text-sm mb-3 line-clamp-2">${scan.description}</div>
-                                            `}
+                                            <div class="text-slate-900 font-medium text-sm mb-3 line-clamp-2">${scan.description}</div>
                                             
                                             <div class="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
                                                 ${scan.sessionType !== 'RM' && scan.palletNumber ? `
