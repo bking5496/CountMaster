@@ -576,6 +576,37 @@
             }
         }
         
+        // Check if FP 5-digit manual entry with same batch AND quantity already exists
+        // (5-digit entries don't have pallet numbers, so we check batch + quantity)
+        async function checkFPManualDuplicateQuantity(sessionId, batchNumber, quantity) {
+            if (!supabase || !sessionId) return null;
+            
+            try {
+                const cleanBatch = String(batchNumber).trim();
+                const { data, error } = await supabase
+                    .from('stock_scans')
+                    .select('id,scanned_at,scanned_by,device_id,actual_cases,pallet_number')
+                    .eq('session_id', sessionId)
+                    .eq('batch_number', cleanBatch)
+                    .eq('actual_cases', quantity)
+                    .is('pallet_number', null)  // Only check manual entries (no pallet number)
+                    .limit(1);
+                
+                if (error) {
+                    console.error('Error checking FP manual duplicate quantity:', error);
+                    return null;
+                }
+                
+                if (data && data.length > 0) {
+                    return data[0];
+                }
+                return null;
+            } catch (err) {
+                console.error('Failed to check FP manual duplicate quantity:', err);
+                return null;
+            }
+        }
+        
         // Get unit type for a stock code from product_types table
         // If type is "ingredients" -> KG, otherwise -> UN (units)
         function getUnitTypeForStockCode(stockCode) {
@@ -3064,6 +3095,46 @@
                                     `\n\nRecorded by: ${scannedByName}\n` +
                                     `at ${new Date(timestamp).toLocaleString()}\n\n` +
                                     `Are you sure this is a NEW recording\n(different location/pallet)?`,
+                                type: 'confirm',
+                                confirmText: 'Yes, Save New',
+                                cancelText: 'Cancel',
+                                onConfirm: () => resolve(true),
+                                onCancel: () => resolve(false)
+                            });
+                        });
+                        
+                        if (!confirmed) {
+                            // User cancelled - don't save
+                            return;
+                        }
+                    }
+                }
+                
+                // For FP 5-digit manual entries (no pallet number), check if same batch+quantity exists
+                // This catches potential duplicate entries where operator enters same count twice
+                if (sessionType === 'FP' && !parsedData.palletNumber && supabase && sessionId && !isUpdate) {
+                    const fpManualDuplicate = await checkFPManualDuplicateQuantity(
+                        sessionId,
+                        parsedData.batchNumber,
+                        actualCases
+                    );
+                    
+                    if (fpManualDuplicate) {
+                        const timestamp = fpManualDuplicate.scanned_at;
+                        const scannedByName = fpManualDuplicate.scanned_by || 'Unknown';
+                        
+                        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                        
+                        const confirmed = await new Promise(resolve => {
+                            this.showModal({
+                                title: 'Possible Duplicate Entry',
+                                message: `This exact recording already exists:\n\n` +
+                                    `Stock Code: ${parsedData.stockCode}\n` +
+                                    `Batch: ${parsedData.batchNumber}\n` +
+                                    `Quantity: ${actualCases} cases\n\n` +
+                                    `Recorded by: ${scannedByName}\n` +
+                                    `at ${new Date(timestamp).toLocaleString()}\n\n` +
+                                    `Are you sure this is a NEW pallet?`,
                                 type: 'confirm',
                                 confirmText: 'Yes, Save New',
                                 cancelText: 'Cancel',
