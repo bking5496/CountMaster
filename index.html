@@ -500,7 +500,7 @@
                 const cleanBatch = String(batchNumber).trim();
                 let query = supabase
                     .from('stock_scans')
-                    .select('id,scanned_at,created_at,scanned_by,device_id,actual_cases')
+                    .select('id,scanned_at,scanned_by,device_id,actual_cases')
                     .eq('session_id', sessionId)
                     .eq('batch_number', cleanBatch);
                 
