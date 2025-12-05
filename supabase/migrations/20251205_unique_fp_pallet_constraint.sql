@@ -5,7 +5,24 @@
 
 BEGIN;
 
--- Create a unique index that only applies to FP scans with pallet numbers
+-- First, identify and remove duplicate FP pallet scans, keeping only the earliest one
+-- This creates a temp table of IDs to delete (all but the first scan for each duplicate set)
+WITH duplicates AS (
+    SELECT id,
+           ROW_NUMBER() OVER (
+               PARTITION BY session_id, batch_number, pallet_number 
+               ORDER BY scanned_at ASC, id ASC
+           ) as rn
+    FROM stock_scans
+    WHERE session_type = 'FP' 
+      AND pallet_number IS NOT NULL
+)
+DELETE FROM stock_scans 
+WHERE id IN (
+    SELECT id FROM duplicates WHERE rn > 1
+);
+
+-- Now create the unique index that only applies to FP scans with pallet numbers
 -- This allows RM scans and FP 5-digit manual scans (no pallet) to have duplicates
 CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_scans_unique_fp_pallet 
 ON stock_scans (session_id, batch_number, pallet_number)
