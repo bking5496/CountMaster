@@ -384,9 +384,22 @@
                         .select();
                     
                     if (error) {
-                        console.error('Failed to sync offline scan:', error);
-                        offlineSyncQueue.incrementRetry(item.id);
-                        failed++;
+                        // Check if this is a unique constraint violation (race condition duplicate)
+                        // PostgreSQL error code 23505 = unique_violation
+                        const isDuplicateError = error.code === '23505' || 
+                            error.message?.includes('duplicate') || 
+                            error.message?.includes('unique constraint');
+                        
+                        if (isDuplicateError && record.session_type === 'FP' && record.pallet_number) {
+                            // Another device synced this pallet first - not an error, just skip
+                            console.log('Race condition duplicate detected, skipping:', item.id, record.batch_number, record.pallet_number);
+                            offlineSyncQueue.removeFromQueue(item.id);
+                            skippedDuplicates++;
+                        } else {
+                            console.error('Failed to sync offline scan:', error);
+                            offlineSyncQueue.incrementRetry(item.id);
+                            failed++;
+                        }
                     } else {
                         console.log('Successfully synced offline scan:', item.id);
                         offlineSyncQueue.removeFromQueue(item.id);
