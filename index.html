@@ -344,12 +344,13 @@
             const queue = offlineSyncQueue.getQueue();
             if (queue.length === 0) {
                 console.log('No offline scans to sync');
-                return { synced: 0, failed: 0 };
+                return { synced: 0, failed: 0, skippedDuplicates: 0 };
             }
             
             console.log(`Syncing ${queue.length} offline scans...`);
             let synced = 0;
             let failed = 0;
+            let skippedDuplicates = 0;
             
             for (const item of queue) {
                 // Skip items that have failed too many times
@@ -361,6 +362,21 @@
                 
                 try {
                     const record = item.data;
+                    
+                    // Check for FP 13-digit duplicates (has pallet_number)
+                    if (record.session_type === 'FP' && record.pallet_number) {
+                        const existingDup = await checkDuplicateInSupabase(
+                            record.session_id,
+                            record.batch_number,
+                            record.pallet_number
+                        );
+                        if (existingDup) {
+                            console.log('Offline scan is duplicate FP pallet, skipping:', item.id, record.batch_number, record.pallet_number);
+                            offlineSyncQueue.removeFromQueue(item.id);
+                            skippedDuplicates++;
+                            continue;
+                        }
+                    }
                     
                     const { data, error } = await supabase
                         .from('stock_scans')
@@ -383,8 +399,8 @@
                 }
             }
             
-            console.log(`Offline sync complete: ${synced} synced, ${failed} failed`);
-            return { synced, failed };
+            console.log(`Offline sync complete: ${synced} synced, ${failed} failed, ${skippedDuplicates} duplicates skipped`);
+            return { synced, failed, skippedDuplicates };
         }
 
         // Product Database - loaded from Supabase or localStorage cache
@@ -2056,10 +2072,14 @@
                     // Close info modal and show result
                     this.closeModal();
                     
-                    if (result.synced > 0 || result.failed > 0) {
-                        const message = result.failed > 0
-                            ? `Synced ${result.synced} scan${result.synced !== 1 ? 's' : ''}. ${result.failed} failed (will retry).`
-                            : `Successfully synced ${result.synced} offline scan${result.synced !== 1 ? 's' : ''}!`;
+                    if (result.synced > 0 || result.failed > 0 || result.skippedDuplicates > 0) {
+                        let message = `Synced ${result.synced} scan${result.synced !== 1 ? 's' : ''}.`;
+                        if (result.skippedDuplicates > 0) {
+                            message += ` ${result.skippedDuplicates} duplicate${result.skippedDuplicates !== 1 ? 's' : ''} skipped.`;
+                        }
+                        if (result.failed > 0) {
+                            message += ` ${result.failed} failed (will retry).`;
+                        }
                         
                         this.showModal({
                             title: result.failed > 0 ? '⚠️ Sync Partial' : '✅ Sync Complete',
@@ -2114,10 +2134,14 @@
                 const result = await syncOfflineScans();
                 this.closeModal();
                 
-                if (result.synced > 0 || result.failed > 0) {
-                    const message = result.failed > 0
-                        ? `Synced ${result.synced} scan${result.synced !== 1 ? 's' : ''}. ${result.failed} failed (will retry).`
-                        : `Successfully synced ${result.synced} scan${result.synced !== 1 ? 's' : ''}!`;
+                if (result.synced > 0 || result.failed > 0 || result.skippedDuplicates > 0) {
+                    let message = `Synced ${result.synced} scan${result.synced !== 1 ? 's' : ''}.`;
+                    if (result.skippedDuplicates > 0) {
+                        message += ` ${result.skippedDuplicates} duplicate${result.skippedDuplicates !== 1 ? 's' : ''} skipped.`;
+                    }
+                    if (result.failed > 0) {
+                        message += ` ${result.failed} failed (will retry).`;
+                    }
                     
                     this.showModal({
                         title: result.failed > 0 ? '⚠️ Sync Partial' : '✅ Sync Complete',
