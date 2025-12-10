@@ -7501,9 +7501,19 @@
                                     </div>
                                 </div>
                                 
+                                <!-- Location Indicator (when active) -->
+                                ${this.activeLocation ? `
+                                <div class="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+                                    <div class="bg-purple-600/90 backdrop-blur-md text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 shadow-lg">
+                                        <span>📍</span>
+                                        <span>${this.activeLocation}</span>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
                                 <div class="absolute bottom-20 left-0 right-0 text-center pointer-events-none">
                                     <div class="inline-block bg-black/60 backdrop-blur-md text-white px-6 py-2 rounded-full text-sm font-medium">
-                                        Align QR code within frame
+                                        ${this.activeLocation ? 'Scan products for this location' : 'Align QR code within frame'}
                                     </div>
                                 </div>
                             </div>
