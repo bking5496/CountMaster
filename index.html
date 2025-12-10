@@ -2031,6 +2031,9 @@
                 this.showingSessionHistory = false;
                 this.showingWarehouseSetup = false;
                 this.showingLocationPicker = false;
+                this.showingLocationManagement = false; // Location management page
+                this.showingQRGenerator = false; // QR code generator page
+                this.activeLocation = null; // Current scanned location (e.g., RACK-01-F-A-3)
                 this.selectedRackForPicker = null;
                 this.selectedStockTakeType = null; // 'FP' or 'RM' - selected before session
                 this.historySessions = [];
@@ -3277,6 +3280,47 @@
                 if (navigator.vibrate) navigator.vibrate(200);
 
                 this.stopScanning();
+
+                // ===== LOCATION QR CODE DETECTION =====
+                // Check if this is a location QR code (RACK-* or FLOOR-*)
+                if (isLocationCode(cleanedCode)) {
+                    const locationCode = cleanedCode.toUpperCase();
+                    const parsed = parseLocationCode(locationCode);
+
+                    if (parsed) {
+                        // Set as active location
+                        this.activeLocation = locationCode;
+
+                        // Also update session settings for backward compatibility
+                        this.sessionSettings.currentLocation = locationCode;
+                        this.sessionSettings.locationScanningEnabled = true;
+                        saveSessionSettings(this.sessionSettings);
+
+                        // Find location details from cache (if exists)
+                        const locationDetails = getLocationByCode(locationCode);
+                        const locationType = parsed.type === 'rack' ? 'Rack' : 'Floor';
+                        const locationDesc = locationDetails?.description || '';
+
+                        // Show success feedback
+                        this.triggerHaptic('success');
+                        this.showModal({
+                            title: '📍 Location Set',
+                            message: `${locationType} location scanned:\n\n${locationCode}${locationDesc ? '\n' + locationDesc : ''}\n\nAll scans will now be tagged with this location.\nScan another location QR to change.`,
+                            type: 'success'
+                        });
+
+                        // Auto-close modal after 2 seconds and restart scanner
+                        setTimeout(() => {
+                            this.closeModal();
+                            this.render();
+                            // Auto-restart scanner for continuous scanning
+                            setTimeout(() => this.startScanning(), 300);
+                        }, 2000);
+
+                        return;
+                    }
+                }
+                // ===== END LOCATION QR CODE DETECTION =====
 
                 // Check if we're waiting for FP stock code scan
                 if (this._waitingForFPStockCode && this._unknownFPParsed) {
