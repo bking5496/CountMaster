@@ -102,7 +102,9 @@
         .animate-pulse,
         .animate-spin,
         .hover-lift,
-        #scanner video {
+        #scanner video,
+        .view-transition,
+        .swipe-item {
             will-change: transform;
             transform: translateZ(0);
         }
@@ -112,17 +114,318 @@
             contain: layout style;
         }
 
-        /* Smooth animations */
+        /* ========================================
+           SMOOTH VIEW TRANSITIONS
+           ======================================== */
+
+        /* Fade in animation for views */
         .animate-fade-in {
-            animation: fadeIn 0.15s ease-out;
+            animation: fadeIn 0.2s ease-out;
         }
 
         @keyframes fadeIn {
             from {
                 opacity: 0;
+                transform: translateY(8px);
             }
 
             to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Slide up animation for modals and cards */
+        .animate-slide-up {
+            animation: slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Scale in animation for buttons and actions */
+        .animate-scale-in {
+            animation: scaleIn 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* Smooth page transitions */
+        .view-transition {
+            transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+        }
+
+        /* ========================================
+           SWIPE TO DELETE
+           ======================================== */
+
+        /* Swipe container */
+        .swipe-container {
+            position: relative;
+            overflow: hidden;
+            border-radius: 12px;
+        }
+
+        /* Swipe item (the content that slides) */
+        .swipe-item {
+            position: relative;
+            background: white;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            touch-action: pan-y;
+            user-select: none;
+        }
+
+        .swipe-item.swiping {
+            transition: none;
+        }
+
+        .swipe-item.swiped-left {
+            transform: translateX(-80px);
+        }
+
+        /* Delete action revealed behind swipe */
+        .swipe-delete-action {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 80px;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.75rem;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .swipe-container:has(.swipe-item.swiped-left) .swipe-delete-action,
+        .swipe-container:has(.swipe-item.swiping) .swipe-delete-action {
+            opacity: 1;
+        }
+
+        /* Swipe hint animation */
+        @keyframes swipeHint {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            50% {
+                transform: translateX(-10px);
+            }
+        }
+
+        .swipe-hint {
+            animation: swipeHint 1.5s ease-in-out infinite;
+        }
+
+        /* ========================================
+           CONSISTENT ICON STYLING
+           ======================================== */
+
+        /* Action icon base styles */
+        .action-icon {
+            width: 1.25rem;
+            height: 1.25rem;
+            flex-shrink: 0;
+            transition: transform 0.15s ease, color 0.15s ease;
+        }
+
+        .action-icon-lg {
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+
+        .action-icon-sm {
+            width: 1rem;
+            height: 1rem;
+        }
+
+        /* Icon button hover effects */
+        .icon-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            transition: all 0.15s ease;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+        }
+
+        .icon-btn:hover .action-icon {
+            transform: scale(1.1);
+        }
+
+        .icon-btn:active .action-icon {
+            transform: scale(0.95);
+        }
+
+        /* Icon colors by semantic meaning */
+        .icon-primary {
+            color: #3b82f6;
+        }
+
+        /* blue-500 */
+        .icon-success {
+            color: #22c55e;
+        }
+
+        /* green-500 */
+        .icon-warning {
+            color: #f59e0b;
+        }
+
+        /* amber-500 */
+        .icon-danger {
+            color: #ef4444;
+        }
+
+        /* red-500 */
+        .icon-muted {
+            color: #94a3b8;
+        }
+
+        /* slate-400 */
+
+        /* ========================================
+           ENHANCED BUTTON ANIMATIONS
+           ======================================== */
+
+        /* Button press effect */
+        .btn-press {
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+
+        .btn-press:active {
+            transform: scale(0.97);
+        }
+
+        /* Floating action button animations */
+        .fab {
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.2s ease,
+                background-color 0.15s ease;
+        }
+
+        .fab:hover {
+            transform: scale(1.05);
+        }
+
+        .fab:active {
+            transform: scale(0.95);
+        }
+
+        /* ========================================
+           LIST ITEM ANIMATIONS
+           ======================================== */
+
+        /* Staggered list entry */
+        .list-item-enter {
+            animation: listItemEnter 0.3s ease-out backwards;
+        }
+
+        @keyframes listItemEnter {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Delete animation */
+        .list-item-exit {
+            animation: listItemExit 0.25s ease-out forwards;
+        }
+
+        @keyframes listItemExit {
+            to {
+                opacity: 0;
+                transform: translateX(100%);
+                height: 0;
+                padding: 0;
+                margin: 0;
+            }
+        }
+
+        /* ========================================
+           LOADING STATES
+           ======================================== */
+
+        /* Skeleton loading */
+        .skeleton {
+            background: linear-gradient(90deg,
+                    #f1f5f9 25%,
+                    #e2e8f0 50%,
+                    #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: skeleton 1.5s infinite;
+            border-radius: 0.5rem;
+        }
+
+        @keyframes skeleton {
+            0% {
+                background-position: 200% 0;
+            }
+
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        /* ========================================
+           TOUCH FEEDBACK
+           ======================================== */
+
+        /* Ripple effect container */
+        .ripple-container {
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Haptic visual feedback */
+        .haptic-flash {
+            animation: hapticFlash 0.1s ease-out;
+        }
+
+        @keyframes hapticFlash {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+
+            100% {
                 opacity: 1;
             }
         }
@@ -2590,6 +2893,94 @@
                     light: [20]
                 };
                 navigator.vibrate(patterns[type] || patterns.light);
+            }
+
+            // Initialize swipe-to-delete on scan list items
+            initSwipeToDelete() {
+                const containers = document.querySelectorAll('.swipe-container');
+
+                containers.forEach(container => {
+                    const item = container.querySelector('.swipe-item');
+                    const deleteAction = container.querySelector('.swipe-delete-action');
+                    if (!item || !deleteAction) return;
+
+                    let startX = 0;
+                    let currentX = 0;
+                    let isSwiping = false;
+                    const threshold = 50; // Minimum swipe distance to trigger
+                    const maxSwipe = 80; // Maximum swipe distance
+
+                    const handleTouchStart = (e) => {
+                        const touch = e.touches[0];
+                        startX = touch.clientX;
+                        currentX = startX;
+                        isSwiping = true;
+                        item.classList.add('swiping');
+                        item.classList.remove('swiped-left');
+                    };
+
+                    const handleTouchMove = (e) => {
+                        if (!isSwiping) return;
+
+                        const touch = e.touches[0];
+                        currentX = touch.clientX;
+                        const diff = startX - currentX;
+
+                        // Only allow left swipe
+                        if (diff > 0) {
+                            const translateX = Math.min(diff, maxSwipe);
+                            item.style.transform = `translateX(-${translateX}px)`;
+
+                            // Prevent vertical scroll while swiping
+                            if (diff > 10) {
+                                e.preventDefault();
+                            }
+                        }
+                    };
+
+                    const handleTouchEnd = () => {
+                        if (!isSwiping) return;
+
+                        isSwiping = false;
+                        item.classList.remove('swiping');
+                        item.style.transform = '';
+
+                        const diff = startX - currentX;
+
+                        if (diff > threshold) {
+                            // Swipe detected - reveal delete button
+                            item.classList.add('swiped-left');
+                            this.triggerHaptic('light');
+                        } else {
+                            // Reset position
+                            item.classList.remove('swiped-left');
+                        }
+                    };
+
+                    // Reset when clicking elsewhere
+                    const handleClickOutside = (e) => {
+                        if (!container.contains(e.target)) {
+                            item.classList.remove('swiped-left');
+                        }
+                    };
+
+                    item.addEventListener('touchstart', handleTouchStart, { passive: true });
+                    item.addEventListener('touchmove', handleTouchMove, { passive: false });
+                    item.addEventListener('touchend', handleTouchEnd, { passive: true });
+                    document.addEventListener('click', handleClickOutside);
+
+                    // Handle delete action click
+                    deleteAction.addEventListener('click', () => {
+                        const scanId = container.dataset.scanId;
+                        if (scanId) {
+                            // Add exit animation
+                            container.classList.add('list-item-exit');
+                            setTimeout(() => {
+                                this.deleteScan(scanId);
+                            }, 200);
+                        }
+                    });
+                });
             }
 
             async prefetchReferenceData() {
@@ -7120,6 +7511,13 @@
 
                 const updateView = (html) => {
                     app.innerHTML = html;
+                    // Add fade-in animation class to the app container
+                    app.classList.add('animate-fade-in');
+                    setTimeout(() => app.classList.remove('animate-fade-in'), 200);
+
+                    // Initialize swipe-to-delete on scan list items
+                    requestAnimationFrame(() => this.initSwipeToDelete());
+
                     // Restore scroll position if we are in the main list view
                     // (heuristic: if we are not showing a modal or special screen)
                     if (!this.showingStartStockTake && !this.showingSettings && !this.showingProductDB && !this.showingRMProductDB && !this.showingSessionHistory) {
@@ -8941,7 +9339,17 @@
                         const borderColor = isExpired ? 'bg-red-500' : (scan.actualCases !== scan.casesOnPallet ? 'bg-yellow-500' : 'bg-emerald-500');
                         const escapedId = scan.id.toString().replace(/'/g, "\\'");
                         return `
-                                <div onclick="app.editScan('${escapedId}')" class="cursor-pointer bg-white rounded-2xl p-4 shadow-sm border ${isExpired ? 'border-red-200 bg-red-50' : 'border-slate-100'} relative overflow-hidden group hover-lift transition-all active:scale-[0.98]">
+                                <div class="swipe-container list-item-enter" data-scan-id="${escapedId}" style="animation-delay: ${Math.min(this.scans.indexOf(scan) * 0.03, 0.3)}s">
+                                    <div class="swipe-delete-action">
+                                        <div class="flex flex-col items-center gap-1">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                            </svg>
+                                            <span>Delete</span>
+                                        </div>
+                                    </div>
+                                    <div class="swipe-item" onclick="app.editScan('${escapedId}')">
+                                        <div class="cursor-pointer bg-white rounded-2xl p-4 shadow-sm border ${isExpired ? 'border-red-200 bg-red-50' : 'border-slate-100'} relative overflow-hidden group hover-lift transition-all active:scale-[0.98]">
                                     <div class="absolute top-0 left-0 w-1 h-full ${borderColor}"></div>
                                     <div class="pl-3 flex items-start justify-between">
                                         <div class="flex-1 min-w-0">
@@ -9010,14 +9418,16 @@
                                                 <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">${scan.unitType === 'kg' ? 'KG' : (scan.unitType === 'units' ? 'UN' : 'Cases')}</div>
                                             </div>
                                             
-                                            <button onclick="event.stopPropagation(); app.deleteScan('${escapedId}')" class="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <button onclick="event.stopPropagation(); app.deleteScan('${escapedId}')" class="hidden sm:block p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors icon-btn" title="Delete scan">
+                                                <svg class="w-5 h-5 action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                                 </svg>
                                             </button>
                                         </div>
                                     </div>
                                 </div>
+                                    </div><!-- End swipe-item -->
+                                </div><!-- End swipe-container -->
                             `;
                     }).join('')}
                             </div>
