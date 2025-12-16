@@ -3,8 +3,10 @@
 // ===========================================
 
 // Supabase Configuration
-const SUPABASE_URL = 'https://exltxjvzsefmaxlgxyio.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4bHR4anZ6c2VmbWF4bGd4eWlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0NTQ2MjcsImV4cCI6MjA4MDAzMDYyN30.kc5RFVrN5orQ7AqPd51ot-sK1xbWsy_58ToowCvYhZw';
+// Supabase Configuration
+// Load from window.env (local dev) or process.env (bundlers)
+const SUPABASE_URL = window.env?.SUPABASE_URL || 'https://YOUR_PROJECT_ID.supabase.co';
+const SUPABASE_ANON_KEY = window.env?.SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY';
 const HEARTBEAT_INTERVAL_MS = 15000;
 const HEARTBEAT_GRACE_MS = 45000;
 
