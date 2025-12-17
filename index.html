@@ -42,7 +42,9 @@
     <div id="floating-buttons"></div>
 
     <!-- Application Logic -->
-    <script src="js/env.js"></script>
+    <!-- env.js is optional - contains Supabase credentials, falls back to localStorage if missing -->
+    <script>window.env = window.env || {};</script>
+    <script src="js/env.js" onerror="console.log('env.js not found, using localStorage mode');"></script>
     <script src="js/config.js"></script>
     <script src="js/helpers.js"></script>
     <script src="js/locations.js"></script>
