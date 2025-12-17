@@ -177,7 +177,7 @@ const getSessionById = (date, sessionId) => {
 };
 
 // Supabase session helpers
-const supabaseSessionsEnabled = Boolean(typeof supabase !== 'undefined' && supabase);
+const supabaseSessionsEnabled = Boolean(typeof supabaseClient !== 'undefined' && supabaseClient);
 
 const mapSupabaseSession = (row) => ({
     id: row.id,
@@ -217,9 +217,9 @@ const buildSupabaseSessionPayload = (session) => {
 };
 
 async function syncSessionsFromSupabase(date) {
-    if (!supabase || !date) return;
+    if (!supabaseClient || !date) return;
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('stock_takes')
             .select('*')
             .eq('take_date', date)
@@ -244,12 +244,12 @@ async function syncSessionsFromSupabase(date) {
 }
 
 async function saveSessionToSupabase(session) {
-    if (!supabase || !session) return true;
+    if (!supabaseClient || !session) return true;
     const isDuplicateError = (err) => err?.code === '23505' || /duplicate key value/i.test(err?.message || '');
 
     try {
         // First, check if session already exists to preserve started_by
-        const { data: existing } = await supabase
+        const { data: existing } = await supabaseClient
             .from('stock_takes')
             .select('started_by, started_at, metadata')
             .eq('id', session.id)
@@ -267,7 +267,7 @@ async function saveSessionToSupabase(session) {
             }
         }
 
-        const { error } = await supabase
+        const { error } = await supabaseClient
             .from('stock_takes')
             .upsert(payload, { onConflict: 'id' });
         if (!error) {
@@ -275,7 +275,7 @@ async function saveSessionToSupabase(session) {
         }
 
         if (isDuplicateError(error)) {
-            const { error: updateError } = await supabase
+            const { error: updateError } = await supabaseClient
                 .from('stock_takes')
                 .update(payload)
                 .eq('id', session.id);
@@ -298,9 +298,9 @@ async function saveSessionToSupabase(session) {
 }
 
 async function fetchSessionDevicesMap(sessionIds = []) {
-    if (!supabase || sessionIds.length === 0) return {};
+    if (!supabaseClient || sessionIds.length === 0) return {};
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('session_devices')
             .select('*')
             .in('session_id', sessionIds);
@@ -330,10 +330,10 @@ async function fetchSessionDevicesMap(sessionIds = []) {
 }
 
 async function upsertSessionDevicePresence(sessionId, status = 'active', sessionSnapshot = null) {
-    if (!supabase || !sessionId) return;
+    if (!supabaseClient || !sessionId) return;
 
     const invokeHeartbeat = async () => {
-        const { error } = await supabase.rpc('upsert_session_device', {
+        const { error } = await supabaseClient.rpc('upsert_session_device', {
             p_session_id: sessionId,
             p_device_id: DEVICE_ID,
             p_user_name: getUserName() || 'Unknown',
@@ -383,9 +383,9 @@ async function upsertSessionDevicePresence(sessionId, status = 'active', session
 }
 
 async function changeSessionStatusSupabase(session, nextStatus, reason = '', metadata = {}) {
-    if (!supabase || !session?.id) return null;
+    if (!supabaseClient || !session?.id) return null;
     try {
-        const { data: existing } = await supabase
+        const { data: existing } = await supabaseClient
             .from('stock_takes')
             .select('status')
             .eq('id', session.id)
@@ -395,14 +395,14 @@ async function changeSessionStatusSupabase(session, nextStatus, reason = '', met
             resumed_at: nextStatus === 'active' ? new Date().toISOString() : session.resumed_at,
             completed_at: nextStatus === 'completed' ? new Date().toISOString() : session.completed_at
         };
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('stock_takes')
             .update({ status: nextStatus, metadata: { ...(session.metadata || {}), ...metadata }, ...timestamps })
             .eq('id', session.id)
             .select()
             .maybeSingle();
         if (error) throw error;
-        await supabase
+        await supabaseClient
             .from('session_status_events')
             .insert({
                 session_id: session.id,
