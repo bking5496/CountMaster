@@ -11,7 +11,7 @@ let _locationsLoadPromise = null;
 async function loadLocationsFromSupabase(forceReload = false) {
     if (_locationsLoadPromise && !forceReload) return _locationsLoadPromise;
     if (locationsLoadedFromDB && !forceReload) return true;
-    if (!supabase) {
+    if (!supabaseClient) {
         console.log('Supabase not available, using cached locations');
         return false;
     }
@@ -19,7 +19,7 @@ async function loadLocationsFromSupabase(forceReload = false) {
     _locationsLoadPromise = (async () => {
         try {
             console.log('Loading warehouse locations from Supabase...');
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('warehouse_locations')
                 .select('*')
                 .eq('is_active', true)
@@ -63,7 +63,7 @@ function getLocationByCode(code) {
 
 // Add a new warehouse location to Supabase
 async function addLocationToSupabase(locationData) {
-    if (!supabase) return { success: false, error: 'Supabase not available' };
+    if (!supabaseClient) return { success: false, error: 'Supabase not available' };
 
     try {
         const locationCode = locationData.location_code.toUpperCase();
@@ -74,7 +74,7 @@ async function addLocationToSupabase(locationData) {
             return { success: false, error: 'Location already exists', exists: true };
         }
 
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('warehouse_locations')
             .insert({
                 location_code: locationCode,
@@ -109,10 +109,10 @@ async function addLocationToSupabase(locationData) {
 
 // Update a warehouse location
 async function updateLocationInSupabase(id, updates) {
-    if (!supabase) return { success: false, error: 'Supabase not available' };
+    if (!supabaseClient) return { success: false, error: 'Supabase not available' };
 
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('warehouse_locations')
             .update(updates)
             .eq('id', id)
@@ -140,11 +140,11 @@ async function updateLocationInSupabase(id, updates) {
 
 // Delete (deactivate) a warehouse location
 async function deleteLocationFromSupabase(id) {
-    if (!supabase) return { success: false, error: 'Supabase not available' };
+    if (!supabaseClient) return { success: false, error: 'Supabase not available' };
 
     try {
         // Soft delete by setting is_active to false
-        const { error } = await supabase
+        const { error } = await supabaseClient
             .from('warehouse_locations')
             .update({ is_active: false })
             .eq('id', id);
@@ -167,7 +167,7 @@ async function deleteLocationFromSupabase(id) {
 
 // Bulk add locations to Supabase
 async function bulkAddLocationsToSupabase(locations) {
-    if (!supabase) return { success: false, error: 'Supabase not available', added: 0, skipped: 0 };
+    if (!supabaseClient) return { success: false, error: 'Supabase not available', added: 0, skipped: 0 };
 
     try {
         // Get existing location codes
@@ -181,7 +181,7 @@ async function bulkAddLocationsToSupabase(locations) {
             return { success: true, added: 0, skipped: skippedCount, message: 'All locations already exist' };
         }
 
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('warehouse_locations')
             .insert(newLocations.map(l => ({
                 location_code: l.location_code.toUpperCase(),

@@ -56,7 +56,7 @@ const offlineSyncQueue = {
 
 // Sync all offline scans to Supabase
 async function syncOfflineScans() {
-    if (!supabase || !navigator.onLine) {
+    if (!supabaseClient || !navigator.onLine) {
         console.log('Cannot sync - offline or no Supabase');
         return { synced: 0, failed: 0 };
     }
@@ -101,7 +101,7 @@ async function syncOfflineScans() {
                 }
             }
 
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('stock_scans')
                 .insert([record])
                 .select();
