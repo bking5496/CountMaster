@@ -26,13 +26,12 @@ jobs:
 
       - name: Create env.js with secrets
         run: |
-          cat > js/env.js << 'EOF'
-          // Environment configuration (injected at build time)
-          window.env = {
-              SUPABASE_URL: '${{ secrets.SUPABASE_URL }}',
-              SUPABASE_ANON_KEY: '${{ secrets.SUPABASE_ANON_KEY }}'
-          };
-          EOF
+          echo "// Environment configuration (injected at build time)" > js/env.js
+          echo "window.env = {" >> js/env.js
+          echo "    SUPABASE_URL: '${{ secrets.SUPABASE_URL }}'," >> js/env.js
+          echo "    SUPABASE_ANON_KEY: '${{ secrets.SUPABASE_ANON_KEY }}'" >> js/env.js
+          echo "};" >> js/env.js
+          cat js/env.js
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
