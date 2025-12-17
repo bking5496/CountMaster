@@ -21,11 +21,12 @@ const supabaseCredentialsConfigured = Boolean(window.supabase?.createClient)
     && !SUPABASE_ANON_KEY.includes('YOUR_SUPABASE_ANON_KEY');
 
 // Initialize Supabase client whenever credentials exist
-let supabase = null;
+// Note: Using 'supabaseClient' to avoid conflict with 'supabase' global from CDN
+var supabaseClient = null;
 if (supabaseCredentialsConfigured) {
     // Initialize Supabase Client
     if (window.supabase && typeof window.supabase.createClient === 'function') {
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             auth: {
                 persistSession: true,
                 autoRefreshToken: true
@@ -35,7 +36,7 @@ if (supabaseCredentialsConfigured) {
             }
         });
         // Expose the Supabase client instance globally
-        window.supabaseClient = supabase;
+        window.supabaseClient = supabaseClient;
     } else {
         console.error('Supabase JS library not loaded or createClient is not a function!');
     }
@@ -43,12 +44,12 @@ if (supabaseCredentialsConfigured) {
     try {
         const cachedSession = JSON.parse(localStorage.getItem('supabaseSessionCache') || 'null');
         if (cachedSession?.access_token && cachedSession?.refresh_token) {
-            supabase.auth.setSession({
+            supabaseClient.auth.setSession({
                 access_token: cachedSession.access_token,
                 refresh_token: cachedSession.refresh_token
             }).catch(() => localStorage.removeItem('supabaseSessionCache'));
         }
-        supabase.auth.onAuthStateChange((_event, session) => {
+        supabaseClient.auth.onAuthStateChange((_event, session) => {
             if (session?.access_token && session?.refresh_token) {
                 localStorage.setItem('supabaseSessionCache', JSON.stringify({
                     access_token: session.access_token,
@@ -69,9 +70,9 @@ const db = {
 
     async init() {
         // Try Supabase
-        if (supabase) {
+        if (supabaseClient) {
             try {
-                const { error } = await supabase.from('stock_scans').select('id').limit(1);
+                const { error } = await supabaseClient.from('stock_scans').select('id').limit(1);
                 if (!error || error.code === 'PGRST116') { // Table might be empty
                     this.connected = true;
                     this.mode = 'supabase';
@@ -93,7 +94,7 @@ const db = {
 
     async insertStockTake(date) {
         if (this.mode === 'supabase') {
-            const { error } = await supabase.from('stock_takes').upsert({
+            const { error } = await supabaseClient.from('stock_takes').upsert({
                 take_date: date,
                 status: 'active'
             }, { onConflict: 'take_date' });
@@ -104,7 +105,7 @@ const db = {
 
     async getStockScans(date) {
         if (this.mode === 'supabase') {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('stock_scans')
                 .select('*')
                 .eq('take_date', date)
@@ -116,7 +117,7 @@ const db = {
 
     async insertStockScan(scan) {
         if (this.mode === 'supabase') {
-            const { error } = await supabase.from('stock_scans').insert({
+            const { error } = await supabaseClient.from('stock_scans').insert({
                 take_date: scan.take_date,
                 batch_number: scan.batch_number,
                 pallet_number: scan.pallet_number,
@@ -135,7 +136,7 @@ const db = {
 
     async checkDuplicate(date, batchNumber, palletNumber) {
         if (this.mode === 'supabase') {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('stock_scans')
                 .select('*')
                 .eq('take_date', date)
@@ -150,7 +151,7 @@ const db = {
 
     async deleteStockScan(id) {
         if (this.mode === 'supabase') {
-            const { error } = await supabase.from('stock_scans').delete().eq('id', id);
+            const { error } = await supabaseClient.from('stock_scans').delete().eq('id', id);
             return !error;
         }
         return false;
