@@ -5786,14 +5786,13 @@ class ScannerApp {
                                             ${(() => {
                     const role = getUserRole();
                     const warehouse = getUserWarehouse();
+                    const siteBadge = warehouse ? `<span class="ml-2 px-2 py-0.5 ${warehouse === 'PSA' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'} rounded-full text-xs font-bold">${warehouse}</span>` : '';
                     if (role === 'admin') {
-                        return '<div class="mt-3 flex justify-center"><div class="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-50 text-purple-700 border border-purple-100 rounded-full text-xs font-bold shadow-sm">👑 Admin Access</div></div>';
+                        return '<div class="mt-3 flex justify-center"><div class="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-50 text-purple-700 border border-purple-100 rounded-full text-xs font-bold shadow-sm">👑 Admin' + siteBadge + '</div></div>';
                     } else if (role === 'supervisor') {
-                        const warehouseBadge = warehouse ? ` • ${warehouse}` : '';
-                        return '<div class="mt-3 flex justify-center"><div class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 border border-amber-100 rounded-full text-xs font-bold shadow-sm">⭐ Supervisor' + warehouseBadge + '</div></div>';
+                        return '<div class="mt-3 flex justify-center"><div class="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 border border-amber-100 rounded-full text-xs font-bold shadow-sm">⭐ Supervisor' + siteBadge + '</div></div>';
                     } else {
-                        const warehouseBadge = warehouse ? ` • ${warehouse}` : '';
-                        return '<div class="mt-3 flex justify-center"><div class="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 text-slate-600 border border-slate-200 rounded-full text-xs font-bold shadow-sm">👤 Operator' + warehouseBadge + '</div></div>';
+                        return '<div class="mt-3 flex justify-center"><div class="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 text-slate-600 border border-slate-200 rounded-full text-xs font-bold shadow-sm">👤 Operator' + siteBadge + '</div></div>';
                     }
                 })()}
                                         </div>
