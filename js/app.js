@@ -564,7 +564,8 @@ class ScannerApp {
                 { name: 'face', label: 'Face', type: 'select', options: [{ value: 'F', label: 'Front' }, { value: 'B', label: 'Back' }], required: true },
                 { name: 'row', label: 'Row (A-Z)', placeholder: 'A', required: true },
                 { name: 'column', label: 'Column (1-99)', type: 'number', placeholder: '1', required: true },
-                { name: 'warehouse', label: 'Warehouse', type: 'select', options: [{ value: 'PSA', label: 'PSA' }, { value: 'PML', label: 'PML' }] },
+                { name: 'warehouse', label: 'Site', type: 'select', options: [{ value: 'PSA', label: 'PSA' }, { value: 'PML', label: 'PML' }], required: true },
+                { name: 'product_area', label: 'Product Area', type: 'select', options: [{ value: 'FP', label: 'FP (Finished Products)' }, { value: 'RM', label: 'RM (Raw Materials)' }], required: true },
                 { name: 'description', label: 'Description (optional)', placeholder: 'e.g., Aisle 1 near dock' }
             ],
             confirmText: 'Add Location',
@@ -583,6 +584,7 @@ class ScannerApp {
                     rack_row: row,
                     rack_column: column,
                     warehouse: data.warehouse || null,
+                    product_area: data.product_area || 'FP',
                     description: data.description || null
                 });
 
@@ -604,7 +606,8 @@ class ScannerApp {
             type: 'form',
             fields: [
                 { name: 'zone', label: 'Zone Code (e.g., A1)', placeholder: 'A1', required: true },
-                { name: 'warehouse', label: 'Warehouse', type: 'select', options: [{ value: 'PSA', label: 'PSA' }, { value: 'PML', label: 'PML' }] },
+                { name: 'warehouse', label: 'Site', type: 'select', options: [{ value: 'PSA', label: 'PSA' }, { value: 'PML', label: 'PML' }], required: true },
+                { name: 'product_area', label: 'Product Area', type: 'select', options: [{ value: 'FP', label: 'FP (Finished Products)' }, { value: 'RM', label: 'RM (Raw Materials)' }], required: true },
                 { name: 'description', label: 'Description (optional)', placeholder: 'e.g., Staging area' }
             ],
             confirmText: 'Add Location',
@@ -621,6 +624,7 @@ class ScannerApp {
                     location_type: 'floor',
                     floor_zone: zone,
                     warehouse: data.warehouse || null,
+                    product_area: data.product_area || 'FP',
                     description: data.description || null
                 });
 

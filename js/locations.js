@@ -47,11 +47,14 @@ async function loadLocationsFromSupabase(forceReload = false) {
     return _locationsLoadPromise;
 }
 
-// Get all locations (from cache)
-function getWarehouseLocations(warehouse = null) {
+// Get all locations (from cache), filtered by warehouse and/or product area
+function getWarehouseLocations(warehouse = null, productArea = null) {
     let locations = warehouseLocationsCache;
     if (warehouse) {
         locations = locations.filter(l => l.warehouse === warehouse || !l.warehouse);
+    }
+    if (productArea) {
+        locations = locations.filter(l => l.product_area === productArea || !l.product_area);
     }
     return locations;
 }
@@ -85,6 +88,7 @@ async function addLocationToSupabase(locationData) {
                 rack_column: locationData.rack_column || null,
                 floor_zone: locationData.floor_zone || null,
                 warehouse: locationData.warehouse || null,
+                product_area: locationData.product_area || 'FP',
                 description: locationData.description || null,
                 created_by: getUserName() || 'Unknown'
             })
@@ -192,6 +196,7 @@ async function bulkAddLocationsToSupabase(locations) {
                 rack_column: l.rack_column || null,
                 floor_zone: l.floor_zone || null,
                 warehouse: l.warehouse || null,
+                product_area: l.product_area || 'FP',
                 description: l.description || null,
                 created_by: getUserName() || 'Unknown'
             })))
